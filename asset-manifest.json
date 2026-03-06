@@ -1,8 +1,8 @@
 {
   "files": {
-    "main.js": "/metalreyon-dashboard/static/js/main.296f1443.js",
-    "index.html": "/metalreyon-dashboard/index.html",
-    "main.296f1443.js.map": "/metalreyon-dashboard/static/js/main.296f1443.js.map"
+    "main.js": "/metalreyonu-wpdashboard/static/js/main.296f1443.js",
+    "index.html": "/metalreyonu-wpdashboard/index.html",
+    "main.296f1443.js.map": "/metalreyonu-wpdashboard/static/js/main.296f1443.js.map"
   },
   "entrypoints": [
     "static/js/main.296f1443.js"
