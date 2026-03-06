@@ -2,7 +2,7 @@
   "name": "metalreyon-dashboard",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://boracetiner.github.io/metalreyon-dashboard",
+"homepage": "https://boracetiner.github.io/metalreyonu-wpdashboard",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
