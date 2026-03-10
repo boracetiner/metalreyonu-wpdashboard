@@ -25,16 +25,26 @@ export async function getDailyStats(days = 15) {
 }
 
 export async function getKpiStats() {
-  const bugun = new Date(); bugun.setHours(0,0,0,0)
+  const bugun = new Date()
+  bugun.setHours(0, 0, 0, 0)
+  const bugunISO = bugun.toISOString()
+
   const { data: tumKonusmalar } = await supabase
-    .from('conversations').select('status, response_time_minutes')
+    .from('conversations')
+    .select('status, response_time_minutes')
+
   const { data: bugunKonusmalar } = await supabase
-    .from('conversations').select('id').gte('created_at', bugun.toISOString())
+    .from('conversations')
+    .select('id')
+    .gte('created_at', bugunISO)
+
   const total = tumKonusmalar?.length || 0
   const cevaplanan = tumKonusmalar?.filter(c => c.status !== 'open').length || 0
   const bekleyen = tumKonusmalar?.filter(c => c.status === 'open').length || 0
-  const ortSure = tumKonusmalar?.filter(c => c.response_time_minutes)
+  const ortSure = tumKonusmalar
+    ?.filter(c => c.response_time_minutes)
     .reduce((acc, c, _, arr) => acc + c.response_time_minutes / arr.length, 0) || 0
+
   return {
     bugunGelen: bugunKonusmalar?.length || 0,
     yanıtOrani: total ? Math.round((cevaplanan / total) * 100) : 0,
