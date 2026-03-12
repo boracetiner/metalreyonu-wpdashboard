@@ -536,11 +536,379 @@ function Profil({ profil }) {
   );
 }
 
+// ── ATAMA KUYRUGU ───────────────────────────────────────────────────────────
+function AtamaKuyrugu({ profil }) {
+  const [konusmalar, setKonusmalar] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  useEffect(() => { yukle(); }, []);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const { data } = await supabase.from("conversations").select("*").eq("status", "open").is("assigned_agent", null).order("created_at", { ascending: true });
+    setKonusmalar(data || []); setYukleniyor(false);
+  }
+
+  async function atamaYap(konusmaId) {
+    await supabase.from("conversations").update({ assigned_agent: profil.id }).eq("id", konusmaId);
+    yukle();
+  }
+
+  function sure(tarih) {
+    if (!tarih) return "";
+    const fark = Date.now() - new Date(tarih).getTime();
+    const dk = Math.floor(fark / 60000), s = Math.floor(dk / 60), g = Math.floor(s / 24);
+    if (g > 0) return g + " gün"; if (s > 0) return s + " saat"; return dk + " dk";
+  }
+
+  return (
+    <div style={{ padding: "28px 32px" }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Atama Kuyruğu</h1>
+        <p style={{ fontSize: 13, color: "#6b7280" }}>Atanmamış {konusmalar.length} konuşma bekliyor</p>
+      </div>
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+        : konusmalar.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Kuyruk boş</div>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>Tüm konuşmalar atandı</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {konusmalar.map(k => {
+              const isim = k.contact_name || k.contact_phone || "Bilinmiyor";
+              return (
+                <div key={k.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, fontSize: 16 }}>
+                      {isim.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{isim}</div>
+                      <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                        {k.category?.replace(/_/g, " ") || "—"} · {sure(k.created_at)} önce geldi
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => atamaYap(k.id)}
+                    style={{ padding: "8px 18px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
+                    Üstlen
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+// ── PERFORMANS RAPORU ───────────────────────────────────────────────────────
+function PerformansRaporu({ profil }) {
+  const [temsilciler, setTemsilciler] = useState([]);
+  const [yukleniyor, setYukleniyor]   = useState(true);
+  const [donem, setDonem]             = useState("hafta");
+
+  useEffect(() => { yukle(); }, [donem]);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const gun = donem === "bugun" ? 1 : donem === "hafta" ? 7 : 30;
+    const since = new Date(); since.setDate(since.getDate() - gun);
+
+    const [{ data: profiles }, { data: konusmalar }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("rol", "temsilci"),
+      supabase.from("conversations").select("*").gte("created_at", since.toISOString())
+    ]);
+
+    const liste = (profiles || []).map(p => {
+      const atanan   = konusmalar?.filter(k => k.assigned_agent === p.id) || [];
+      const kapanan  = atanan.filter(k => k.status === "kapali" || k.status === "closed");
+      const satis    = atanan.filter(k => k.sonuc === "satis");
+      const oran     = atanan.length ? Math.round((kapanan.length / atanan.length) * 100) : 0;
+      return { ...p, atanan: atanan.length, kapanan: kapanan.length, satis: satis.length, oran };
+    }).sort((a, b) => b.oran - a.oran);
+
+    setTemsilciler(liste); setYukleniyor(false);
+  }
+
+  return (
+    <div style={{ padding: "28px 32px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Performans Raporu</h1>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>Temsilci bazlı istatistikler</p>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["bugun","Bugün"],["hafta","Bu Hafta"],["ay","Bu Ay"]].map(([val, label]) => (
+            <button key={val} onClick={() => setDonem(val)}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid", fontSize: 12, fontWeight: 500, cursor: "pointer",
+                background: donem === val ? "#dcfce7" : "#fff", borderColor: donem === val ? "#16a34a" : "#e5e7eb", color: donem === val ? "#16a34a" : "#6b7280" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+        : temsilciler.length === 0 ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Temsilci bulunamadı</div>
+        : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {temsilciler.map((t, i) => (
+              <div key={t.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: i === 0 ? "linear-gradient(135deg,#f59e0b,#d97706)" : "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
+                      {i === 0 ? "🥇" : t.ad?.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{t.ad} {t.soyad}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{t.atanan} konuşma</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 24 }}>
+                    {[
+                      { label: "Kapanan", val: t.kapanan, renk: "#16a34a" },
+                      { label: "Satış",   val: t.satis,   renk: "#f59e0b" },
+                      { label: "Oran",    val: "%" + t.oran, renk: t.oran > 80 ? "#16a34a" : t.oran > 60 ? "#f59e0b" : "#ef4444" },
+                    ].map((m, j) => (
+                      <div key={j} style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 2 }}>{m.label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: m.renk }}>{m.val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ height: 6, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: t.oran + "%", background: t.oran > 80 ? "#16a34a" : t.oran > 60 ? "#f59e0b" : "#ef4444", borderRadius: 4, transition: "width 0.5s" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+// ── KATEGORİ YÖNETİMİ ──────────────────────────────────────────────────────
+function KategoriYonetimi({ profil }) {
+  const [kategoriler, setKategoriler] = useState([]);
+  const [yukleniyor, setYukleniyor]   = useState(true);
+  const [yeniIsim, setYeniIsim]       = useState("");
+  const [yeniAnahtar, setYeniAnahtar] = useState("");
+  const [mesaj, setMesaj]             = useState(null);
+
+  useEffect(() => { yukle(); }, []);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const { data } = await supabase.from("kategoriler").select("*").order("isim");
+    setKategoriler(data || []); setYukleniyor(false);
+  }
+
+  function bildir(tip, msg) { setMesaj({ tip, msg }); setTimeout(() => setMesaj(null), 3000); }
+
+  async function ekle(e) {
+    e.preventDefault();
+    const { error } = await supabase.from("kategoriler").insert({ isim: yeniIsim, anahtar_kelimeler: yeniAnahtar.split(",").map(s => s.trim()).filter(Boolean), aktif: true });
+    if (error) { bildir("hata", "Eklenemedi: " + error.message); return; }
+    bildir("basari", "Kategori eklendi."); setYeniIsim(""); setYeniAnahtar(""); yukle();
+  }
+
+  async function durumToggle(id, aktif) {
+    await supabase.from("kategoriler").update({ aktif: !aktif }).eq("id", id);
+    yukle();
+  }
+
+  async function sil(id) {
+    if (!window.confirm("Bu kategoriyi silmek istediğinizden emin misiniz?")) return;
+    await supabase.from("kategoriler").delete().eq("id", id);
+    yukle();
+  }
+
+  return (
+    <div style={{ padding: "28px 32px", maxWidth: 700 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Kategori Yönetimi</h1>
+        <p style={{ fontSize: 13, color: "#6b7280" }}>Konuşma kategorilerini yönetin</p>
+      </div>
+      {mesaj && (
+        <div style={{ padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 500,
+          background: mesaj.tip === "basari" ? "#dcfce7" : "#fef2f2",
+          border: "1px solid " + (mesaj.tip === "basari" ? "#bbf7d0" : "#fecaca"),
+          color: mesaj.tip === "basari" ? "#15803d" : "#dc2626" }}>
+          {mesaj.tip === "basari" ? "✅" : "❌"} {mesaj.msg}
+        </div>
+      )}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 16 }}>Yeni Kategori Ekle</div>
+        <form onSubmit={ekle}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Kategori Adı</label>
+              <input value={yeniIsim} onChange={e => setYeniIsim(e.target.value)} required placeholder="ör. Fiyat Sorgusu"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Anahtar Kelimeler (virgülle ayır)</label>
+              <input value={yeniAnahtar} onChange={e => setYeniAnahtar(e.target.value)} placeholder="fiyat, ücret, kaç para"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+          </div>
+          <button type="submit"
+            style={{ padding: "9px 20px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer" }}>
+            + Ekle
+          </button>
+        </form>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+          : kategoriler.map(k => (
+            <div key={k.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+                  {k.isim}
+                  <span style={{ fontSize: 11, fontWeight: 500, color: k.aktif ? "#16a34a" : "#9ca3af", background: k.aktif ? "#dcfce7" : "#f3f4f6", padding: "2px 8px", borderRadius: 4 }}>
+                    {k.aktif ? "Aktif" : "Pasif"}
+                  </span>
+                </div>
+                {k.anahtar_kelimeler?.length > 0 && (
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                    🔑 {k.anahtar_kelimeler.join(", ")}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => durumToggle(k.id, k.aktif)}
+                  style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 11, cursor: "pointer" }}>
+                  {k.aktif ? "Pasif Yap" : "Aktif Yap"}
+                </button>
+                <button onClick={() => sil(k.id)}
+                  style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 11, cursor: "pointer" }}>
+                  Sil
+                </button>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── HAZIR YANITLAR ──────────────────────────────────────────────────────────
+function HazirYanitlar({ profil }) {
+  const [yanitlar, setYanitlar]     = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [yeniBaslik, setYeniBaslik] = useState("");
+  const [yeniKisayol, setYeniKisayol] = useState("");
+  const [yeniIcerik, setYeniIcerik] = useState("");
+  const [mesaj, setMesaj]           = useState(null);
+
+  useEffect(() => { yukle(); }, []);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const { data } = await supabase.from("hazir_yanitlar").select("*").order("kisayol");
+    setYanitlar(data || []); setYukleniyor(false);
+  }
+
+  function bildir(tip, msg) { setMesaj({ tip, msg }); setTimeout(() => setMesaj(null), 3000); }
+
+  async function ekle(e) {
+    e.preventDefault();
+    const kisayol = yeniKisayol.replace(/^\//, "").toLowerCase().replace(/\s+/g, "_");
+    const { error } = await supabase.from("hazir_yanitlar").insert({ baslik: yeniBaslik, kisayol, icerik: yeniIcerik, aktif: true, olusturan: profil?.id });
+    if (error) { bildir("hata", "Eklenemedi: " + error.message); return; }
+    bildir("basari", "Hazır yanıt eklendi."); setYeniBaslik(""); setYeniKisayol(""); setYeniIcerik(""); yukle();
+  }
+
+  async function sil(id) {
+    if (!window.confirm("Bu hazır yanıtı silmek istediğinizden emin misiniz?")) return;
+    await supabase.from("hazir_yanitlar").delete().eq("id", id);
+    yukle();
+  }
+
+  return (
+    <div style={{ padding: "28px 32px", maxWidth: 700 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Hazır Yanıtlar</h1>
+        <p style={{ fontSize: 13, color: "#6b7280" }}>/ kısayoluyla sohbette kullanın</p>
+      </div>
+      {mesaj && (
+        <div style={{ padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 500,
+          background: mesaj.tip === "basari" ? "#dcfce7" : "#fef2f2",
+          border: "1px solid " + (mesaj.tip === "basari" ? "#bbf7d0" : "#fecaca"),
+          color: mesaj.tip === "basari" ? "#15803d" : "#dc2626" }}>
+          {mesaj.tip === "basari" ? "✅" : "❌"} {mesaj.msg}
+        </div>
+      )}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 16 }}>Yeni Hazır Yanıt</div>
+        <form onSubmit={ekle}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Başlık</label>
+              <input value={yeniBaslik} onChange={e => setYeniBaslik(e.target.value)} required placeholder="ör. Fiyat Bilgisi"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Kısayol</label>
+              <input value={yeniKisayol} onChange={e => setYeniKisayol(e.target.value)} required placeholder="ör. fiyat"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Yanıt İçeriği</label>
+            <textarea value={yeniIcerik} onChange={e => setYeniIcerik(e.target.value)} required rows={3}
+              placeholder="Müşteriye gönderilecek mesaj..."
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, resize: "vertical", outline: "none" }} />
+          </div>
+          <button type="submit"
+            style={{ padding: "9px 20px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer" }}>
+            + Ekle
+          </button>
+        </form>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+          : yanitlar.length === 0 ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Henüz hazır yanıt yok</div>
+          : yanitlar.map(y => (
+            <div key={y.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+                    {y.baslik}
+                    <span style={{ fontSize: 11, color: "#16a34a", background: "#dcfce7", padding: "2px 8px", borderRadius: 4, fontFamily: "monospace" }}>/{y.kisayol}</span>
+                  </div>
+                </div>
+                <button onClick={() => sil(y.id)}
+                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 11, cursor: "pointer" }}>
+                  Sil
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", background: "#f9fafb", padding: "8px 12px", borderRadius: 6, lineHeight: 1.6 }}>
+                {y.icerik}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
 // ── ANA APP ────────────────────────────────────────────────────────────────
 const MENU = [
-  { key: "dashboard", label: "📊 Dashboard" },
-  { key: "inbox",     label: "💬 Inbox"     },
-  { key: "profil",    label: "👤 Profil"    },
+  { key: "dashboard",        label: "📊 Dashboard",        roller: ["super_admin","admin","temsilci"] },
+  { key: "inbox",            label: "💬 Inbox",             roller: ["super_admin","admin","temsilci"] },
+  { key: "atama_kuyrugu",    label: "📋 Atama Kuyruğu",    roller: ["super_admin","admin","temsilci"] },
+  { key: "performans",       label: "📈 Performans",        roller: ["super_admin","admin"] },
+  { key: "kategori",         label: "🏷️ Kategoriler",       roller: ["super_admin","admin"] },
+  { key: "hazir_yanitlar",   label: "⚡ Hazır Yanıtlar",    roller: ["super_admin","admin","temsilci"] },
+  { key: "profil",           label: "👤 Profil",            roller: ["super_admin","admin","temsilci"] },
 ];
 
 export default function App() {
@@ -600,7 +968,7 @@ export default function App() {
             </div>
           </div>
           <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-            {MENU.map(item => (
+            {MENU.filter(m => m.roller.includes(profil?.rol || "temsilci")).map(item => (
               <button key={item.key} onClick={() => { setAktifSayfa(item.key); setAktifKonusma(null); }}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aktifSayfa === item.key ? 600 : 500, textAlign: "left", width: "100%",
                   background: aktifSayfa === item.key ? "#dcfce7" : "transparent",
@@ -630,12 +998,17 @@ export default function App() {
         <div style={{ flex: 1, overflow: "auto" }}>
           {aktifKonusma
             ? <Sohbet konusmaId={aktifKonusma} profil={profil} onGeri={() => { setAktifKonusma(null); setAktifSayfa("inbox"); }} />
-            : aktifSayfa === "dashboard" ? <Dashboard profil={profil} />
-            : aktifSayfa === "inbox"     ? <Inbox profil={profil} onSohbetAc={id => setAktifKonusma(id)} />
-            : aktifSayfa === "profil"    ? <Profil profil={profil} />
+            : aktifSayfa === "dashboard"      ? <Dashboard profil={profil} />
+            : aktifSayfa === "inbox"          ? <Inbox profil={profil} onSohbetAc={id => setAktifKonusma(id)} />
+            : aktifSayfa === "atama_kuyrugu"  ? <AtamaKuyrugu profil={profil} />
+            : aktifSayfa === "performans"     ? <PerformansRaporu profil={profil} />
+            : aktifSayfa === "kategori"       ? <KategoriYonetimi profil={profil} />
+            : aktifSayfa === "hazir_yanitlar" ? <HazirYanitlar profil={profil} />
+            : aktifSayfa === "profil"         ? <Profil profil={profil} />
             : null}
         </div>
       </div>
     </>
   );
 }
+
