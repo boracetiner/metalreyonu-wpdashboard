@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/metalreyonu-wpdashboard/static/js/main.da8f7b22.js",
+    "main.js": "/metalreyonu-wpdashboard/static/js/main.4d0d0680.js",
     "index.html": "/metalreyonu-wpdashboard/index.html",
-    "main.da8f7b22.js.map": "/metalreyonu-wpdashboard/static/js/main.da8f7b22.js.map"
+    "main.4d0d0680.js.map": "/metalreyonu-wpdashboard/static/js/main.4d0d0680.js.map"
   },
   "entrypoints": [
-    "static/js/main.da8f7b22.js"
+    "static/js/main.4d0d0680.js"
   ]
 }
