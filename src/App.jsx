@@ -1,143 +1,414 @@
 import { useState, useEffect } from "react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import { getDailyStats, getKpiStats, getKategoriler, getBekleyenler, getTemsilciler } from "./supabaseClient";
+import {
+  supabase, girisYap, cikisYap,
+  getDailyStats, getKpiStats, getKategoriDagilim,
+  getKonusmalar, getMesajlar, mesajGonder, konusmaGuncelle,
+  getHazirYanitlar, getTemsilciler, profilGuncelle, getKategoriler
+} from "./supabaseClient";
 
-const SAATLIK = [
-  { saat: "08", mesaj: 4 }, { saat: "09", mesaj: 12 }, { saat: "10", mesaj: 19 },
-  { saat: "11", mesaj: 22 }, { saat: "12", mesaj: 17 }, { saat: "13", mesaj: 8 },
-  { saat: "14", mesaj: 21 }, { saat: "15", mesaj: 28 }, { saat: "16", mesaj: 24 },
-  { saat: "17", mesaj: 18 }, { saat: "18", mesaj: 11 }, { saat: "19", mesaj: 6 },
+const SONUCLAR = [
+  { key: "satis",           label: "🛒 Satışa Dönüştü",         kapat: true  },
+  { key: "soru_cevaplandi", label: "💬 Soru Cevaplandı",         kapat: true  },
+  { key: "takip",           label: "🔄 Takipte",                 kapat: false },
+  { key: "siparis_cozuldu", label: "📦 Sipariş Takibi Çözüldü",  kapat: true  },
+  { key: "kayip",           label: "❌ Satış Kaybı",             kapat: false },
+  { key: "degisim_tamam",   label: "🔄 Değişim/İade Tamamlandı", kapat: true  },
+  { key: "sikayet_islemde", label: "⚠️ Şikayet Alındı-İşlemde",  kapat: false },
+  { key: "kargo_cozuldu",   label: "🚚 Kargo Sorunu Çözüldü",    kapat: true  },
+  { key: "iade_cozuldu",    label: "✅ İade/Şikayet Çözüldü",    kapat: true  },
+  { key: "spam",            label: "🚫 İlgisiz/Spam",            kapat: true  },
 ];
 
-const OncelikBadge = ({ oncelik }) => {
-  const styles = {
-    kritik: { background: "rgba(239,68,68,0.2)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" },
-    yuksek: { background: "rgba(249,115,22,0.2)", color: "#fb923c", border: "1px solid rgba(249,115,22,0.3)" },
-    orta:   { background: "rgba(245,158,11,0.2)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.3)" },
-  };
-  const labels = { kritik: "Kritik", yuksek: "Yüksek", orta: "Orta" };
-  return <span style={{ ...styles[oncelik], padding: "2px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{labels[oncelik]}</span>;
-};
+const GLOBAL_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #111827; }
+  input, textarea, select, button { font-family: 'Plus Jakarta Sans', sans-serif; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+`;
 
+// ── LOGIN ──────────────────────────────────────────────────────────────────
+function Login() {
+  const [email, setEmail]   = useState("");
+  const [sifre, setSifre]   = useState("");
+  const [hata, setHata]     = useState("");
+  const [yukleniyor, setYukleniyor] = useState(false);
+
+  async function handleGiris(e) {
+    e.preventDefault();
+    setHata(""); setYukleniyor(true);
+    try { await girisYap(email, sifre); }
+    catch { setHata("E-posta veya şifre hatalı."); setYukleniyor(false); }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: "0 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 14px" }}>💬</div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 4 }}>Metal Reyonu</h1>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>WhatsApp Yönetim Paneli</p>
+        </div>
+        <div style={{ background: "#fff", borderRadius: 16, padding: 32, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          {hata && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#dc2626", fontSize: 13 }}>{hata}</div>}
+          <form onSubmit={handleGiris}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>E-posta</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+            <div style={{ marginBottom: 22 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Şifre</label>
+              <input type="password" value={sifre} onChange={e => setSifre(e.target.value)} required
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+            </div>
+            <button type="submit" disabled={yukleniyor}
+              style={{ width: "100%", padding: 11, borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", opacity: yukleniyor ? 0.7 : 1 }}>
+              {yukleniyor ? "Giriş yapılıyor..." : "Giriş Yap"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SOHBET ─────────────────────────────────────────────────────────────────
+function Sohbet({ konusmaId, profil, onGeri }) {
+  const [konusma, setKonusma]     = useState(null);
+  const [mesajlar, setMesajlar]   = useState([]);
+  const [metin, setMetin]         = useState("");
+  const [notModu, setNotModu]     = useState(false);
+  const [hazirYanitlar, setHazirYanitlar] = useState([]);
+  const [hazirOneri, setHazirOneri]       = useState([]);
+  const [sonucModal, setSonucModal]       = useState(false);
+  const [gonderiyor, setGonderiyor]       = useState(false);
+
+  useEffect(() => {
+    yukle();
+    const ch = supabase.channel("sohbet-" + konusmaId)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "conversation_id=eq." + konusmaId },
+        p => setMesajlar(prev => [...prev, p.new]))
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [konusmaId]);
+
+  async function yukle() {
+    const [{ data: k }, m, hy] = await Promise.all([
+      supabase.from("conversations").select("*").eq("id", konusmaId).single(),
+      getMesajlar(konusmaId),
+      getHazirYanitlar()
+    ]);
+    setKonusma(k); setMesajlar(m); setHazirYanitlar(hy);
+  }
+
+  function metinDegistir(val) {
+    setMetin(val);
+    if (val.startsWith("/") && val.length > 1) {
+      const q = val.slice(1).toLowerCase();
+      setHazirOneri(hazirYanitlar.filter(h => h.kisayol?.includes(q) || h.baslik?.toLowerCase().includes(q)).slice(0, 5));
+    } else setHazirOneri([]);
+  }
+
+  async function gonder() {
+    if (!metin.trim() || gonderiyor) return;
+    setGonderiyor(true);
+    try {
+      await mesajGonder({ phone: konusma.contact_phone, message: metin, conversation_id: konusmaId, agent_id: profil?.id, is_note: notModu });
+      setMetin(""); setHazirOneri([]);
+    } catch (err) { alert("Hata: " + err.message); }
+    finally { setGonderiyor(false); }
+  }
+
+  async function kapat(sonucKey) {
+    const s = SONUCLAR.find(x => x.key === sonucKey);
+    await konusmaGuncelle(konusmaId, { sonuc: sonucKey, sonuc_guncellendi: new Date().toISOString(), sonuc_guncelleyen: profil?.id, status: s?.kapat ? "kapali" : "beklemede" });
+    setSonucModal(false); onGeri();
+  }
+
+  if (!konusma) return <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>;
+  const isim = konusma.contact_name || konusma.contact_phone || "Bilinmiyor";
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={onGeri} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#6b7280", padding: "4px 8px" }}>←</button>
+          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700 }}>
+            {isim.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{isim}</div>
+            <div style={{ fontSize: 11, color: "#9ca3af" }}>{konusma.contact_phone} · {konusma.category?.replace(/_/g, " ")}</div>
+          </div>
+        </div>
+        <button onClick={() => setSonucModal(true)}
+          style={{ padding: "8px 16px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
+          ✕ Kapat
+        </button>
+      </div>
+
+      {konusma.onceki_sonuc && (
+        <div style={{ background: "#fffbeb", borderBottom: "1px solid #fed7aa", padding: "8px 20px", fontSize: 12, color: "#92400e" }}>
+          ⚠️ Bu müşteri daha önce <strong>{konusma.onceki_sonuc}</strong> olarak kapandı
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f8fafc" }}>
+        {mesajlar.map(m => {
+          const giden = m.direction === "outbound", not = m.direction === "note";
+          return (
+            <div key={m.id} style={{ display: "flex", justifyContent: not ? "center" : giden ? "flex-end" : "flex-start", marginBottom: 10 }}>
+              <div style={{ maxWidth: "70%", padding: "10px 14px",
+                borderRadius: not ? 8 : giden ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+                background: not ? "#fffbeb" : giden ? "linear-gradient(135deg,#16a34a,#15803d)" : "#fff",
+                color: not ? "#92400e" : giden ? "#fff" : "#111827",
+                border: not ? "1px solid #fed7aa" : giden ? "none" : "1px solid #e5e7eb",
+                fontSize: 13, lineHeight: 1.5 }}>
+                {not && <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>🔒 DAHİLİ NOT</div>}
+                <div>{m.message_text}</div>
+                <div style={{ fontSize: 10, marginTop: 4, opacity: 0.5, textAlign: "right" }}>
+                  {new Date(m.sent_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px" }}>
+        {hazirOneri.length > 0 && (
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 8, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            {hazirOneri.map(h => (
+              <div key={h.id} onClick={() => { setMetin(h.icerik); setHazirOneri([]); }}
+                style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #f9fafb", fontSize: 12, color: "#374151" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                <span style={{ color: "#16a34a", fontWeight: 700 }}>/{h.kisayol}</span>
+                <span style={{ color: "#6b7280", marginLeft: 8 }}>{h.baslik}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {notModu && <div style={{ background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 6, padding: "6px 12px", marginBottom: 8, fontSize: 11, color: "#92400e", fontWeight: 600 }}>🔒 Not modu — müşteri görmez</div>}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea value={metin} onChange={e => metinDegistir(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); gonder(); } }}
+            placeholder={notModu ? "Dahili not yaz..." : "Mesaj yaz... (/ ile hazır yanıt)"}
+            rows={2} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), fontSize: 13, resize: "none", background: notModu ? "#fffbeb" : "#fff", outline: "none" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={() => setNotModu(!notModu)}
+              style={{ padding: "8px 10px", borderRadius: 7, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), background: notModu ? "#fffbeb" : "#fff", cursor: "pointer", fontSize: 14 }}>🔒</button>
+            <button onClick={gonder} disabled={!metin.trim() || gonderiyor}
+              style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (!metin.trim() || gonderiyor) ? 0.5 : 1 }}>↑</button>
+          </div>
+        </div>
+      </div>
+
+      {sonucModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#111827", marginBottom: 4 }}>Konuşmayı Kapat</div>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 20 }}>Bir sonuç seçin</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {SONUCLAR.map(s => (
+                <button key={s.key} onClick={() => kapat(s.key)}
+                  style={{ padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                  {s.label} <span style={{ float: "right", fontSize: 11, color: s.kapat ? "#16a34a" : "#f59e0b" }}>{s.kapat ? "Kapatır" : "Beklemede"}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setSonucModal(false)} style={{ marginTop: 12, width: "100%", padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 13, cursor: "pointer" }}>İptal</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── INBOX ──────────────────────────────────────────────────────────────────
+function Inbox({ profil, onSohbetAc }) {
+  const [konusmalar, setKonusmalar] = useState([]);
+  const [filtre, setFiltre]         = useState("open");
+  const [arama, setArama]           = useState("");
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  useEffect(() => {
+    yukle();
+    const ch = supabase.channel("inbox-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, yukle)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [filtre]);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const data = await getKonusmalar({ status: filtre === "all" ? undefined : filtre });
+    setKonusmalar(data); setYukleniyor(false);
+  }
+
+  const liste = konusmalar.filter(k => {
+    if (!arama) return true;
+    const q = arama.toLowerCase();
+    return k.contact_name?.toLowerCase().includes(q) || k.contact_phone?.includes(q);
+  });
+
+  function sure(tarih) {
+    if (!tarih) return "";
+    const fark = Date.now() - new Date(tarih).getTime();
+    const dk = Math.floor(fark / 60000), s = Math.floor(dk / 60), g = Math.floor(s / 24);
+    if (g > 0) return g + "g"; if (s > 0) return s + "s"; return Math.max(0, dk) + "dk";
+  }
+
+  const DURUM = { open: { label: "Açık", renk: "#16a34a" }, kapali: { label: "Kapalı", renk: "#6b7280" }, beklemede: { label: "Beklemede", renk: "#f59e0b" } };
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff" }}>
+      <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f3f4f6" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>Inbox</h1>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>{liste.length} konuşma</div>
+        </div>
+        <input value={arama} onChange={e => setArama(e.target.value)} placeholder="İsim veya telefon ara..."
+          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, marginBottom: 10, outline: "none" }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["open","Açık"],["beklemede","Beklemede"],["kapali","Kapalı"],["all","Tümü"]].map(([val, label]) => (
+            <button key={val} onClick={() => setFiltre(val)}
+              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid", fontSize: 12, fontWeight: 500, cursor: "pointer",
+                background: filtre === val ? "#dcfce7" : "#fff", borderColor: filtre === val ? "#16a34a" : "#e5e7eb", color: filtre === val ? "#16a34a" : "#6b7280" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {yukleniyor
+          ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+          : liste.length === 0
+            ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Konuşma bulunamadı</div>
+            : liste.map(k => {
+                const isim = k.contact_name || k.contact_phone || "Bilinmiyor";
+                const d = DURUM[k.status] || { label: k.status, renk: "#6b7280" };
+                return (
+                  <div key={k.id} onClick={() => onSohbetAc(k.id)}
+                    style={{ padding: "14px 20px", borderBottom: "1px solid #f9fafb", cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>
+                        {isim.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{isim}</span>
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>{sure(k.last_message_at)}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 11, color: "#9ca3af", flex: 1 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "1px 7px", borderRadius: 4 }}>{d.label}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {k.onceki_sonuc && (
+                      <div style={{ marginTop: 6, marginLeft: 52, fontSize: 11, color: "#f59e0b", background: "#fffbeb", padding: "3px 8px", borderRadius: 4, border: "1px solid #fed7aa" }}>
+                        ⚠️ Önceki: {k.onceki_sonuc}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
 const KpiKart = ({ baslik, deger, alt, renk, icon }) => (
-  <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 24px", position: "relative", overflow: "hidden" }}>
-    <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: renk, opacity: 0.12, filter: "blur(20px)" }} />
-    <div style={{ fontSize: 26, marginBottom: 6 }}>{icon}</div>
-    <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4, fontFamily: "monospace" }}>{baslik}</div>
-    <div style={{ color: "#f1f5f9", fontSize: 32, fontWeight: 800, lineHeight: 1.1 }}>{deger}</div>
-    <div style={{ color: renk, fontSize: 12, marginTop: 6, fontFamily: "monospace" }}>{alt}</div>
+  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+    <div style={{ position: "absolute", top: -15, right: -15, width: 70, height: 70, borderRadius: "50%", background: renk, opacity: 0.08 }} />
+    <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
+    <div style={{ color: "#6b7280", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{baslik}</div>
+    <div style={{ color: "#111827", fontSize: 28, fontWeight: 800, lineHeight: 1.1 }}>{deger}</div>
+    {alt && <div style={{ color: renk, fontSize: 12, marginTop: 4, fontWeight: 500 }}>{alt}</div>}
   </div>
 );
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px" }}>
-      <p style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{label}</p>
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+      <p style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>{label}</p>
       {payload.map((p, i) => <p key={i} style={{ color: p.color, fontSize: 13, fontWeight: 600 }}>{p.name}: {p.value}</p>)}
     </div>
   );
 };
 
-export default function App() {
-  const [sekme, setSekme] = useState("dashboard");
-  const [yukleniyor, setYukleniyor] = useState(true);
-  const [gunluk, setGunluk] = useState([]);
-  const [kpi, setKpi] = useState({ bugunGelen: 0, yanıtOrani: 0, ortSure: 0, bekleyen: 0 });
+function Dashboard({ profil }) {
+  const [kpi, setKpi]               = useState({ bugunGelen: 0, haftaGelen: 0, bekleyen: 0, satis: 0, kapanmaOrani: 0 });
+  const [gunluk, setGunluk]         = useState([]);
   const [kategoriler, setKategoriler] = useState([]);
-  const [bekleyenler, setBekleyenler] = useState([]);
-  const [temsilciler, setTemsilciler] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {
-    async function yukle() {
-      setYukleniyor(true);
-      const [g, k, kat, b, t] = await Promise.all([
-        getDailyStats(), getKpiStats(), getKategoriler(), getBekleyenler(), getTemsilciler()
-      ]);
-      setGunluk(g); setKpi(k); setKategoriler(kat); setBekleyenler(b); setTemsilciler(t);
-      setYukleniyor(false);
-    }
-    yukle();
+    Promise.all([getKpiStats(), getDailyStats(15), getKategoriDagilim()])
+      .then(([k, g, kat]) => { setKpi(k); setGunluk(g); setKategoriler(kat); setYukleniyor(false); })
+      .catch(() => setYukleniyor(false));
   }, []);
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #060d1a; font-family: 'Syne', sans-serif; color: #f1f5f9; }
-        .blink { animation: blink 1.4s infinite; }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-      `}</style>
-
-      {/* HEADER */}
-      <div style={{ background: "rgba(15,23,42,0.95)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #25D366, #128C7E)", display: "flex", alignItems: "center", justifyContent: "center" }}>💬</div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 15 }}>Metal Reyon</div>
-            <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>WA DASHBOARD MVP</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[["dashboard","📊 Dashboard"],["bekleyenler","⏳ Bekleyenler"],["temsilciler","👥 Temsilciler"]].map(([key, label]) => (
-            <button key={key} onClick={() => setSekme(key)} style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", color: sekme === key ? "#f1f5f9" : "#64748b", background: sekme === key ? "rgba(59,130,246,0.2)" : "transparent", border: sekme === key ? "1px solid rgba(59,130,246,0.4)" : "1px solid transparent" }}>{label}</button>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div className="blink" style={{ width: 7, height: 7, borderRadius: "50%", background: "#25D366" }} />
-          <span style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace" }}>{yukleniyor ? "YÜKLENİYOR..." : "CANLI"}</span>
-        </div>
+    <div style={{ padding: "28px 32px" }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Genel Bakış</h1>
+        <p style={{ fontSize: 13, color: "#6b7280" }}>Hoş geldin, {profil?.ad} · Son 15 gün</p>
       </div>
-
-      <div style={{ padding: "28px 32px", maxWidth: 1280, margin: "0 auto" }}>
-
-        {/* DASHBOARD */}
-        {sekme === "dashboard" && (
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Genel Bakış</h1>
-            <p style={{ color: "#64748b", fontSize: 12, fontFamily: "monospace", marginBottom: 24 }}>Son 15 gün · Supabase canlı veri</p>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
-              <KpiKart baslik="Bugün Gelen" deger={kpi.bugunGelen} alt="bugün toplam konuşma" renk="#3b82f6" icon="💬" />
-              <KpiKart baslik="Yanıt Oranı" deger={`%${kpi.yanıtOrani}`} alt="hedef: %90" renk="#25D366" icon="✅" />
-              <KpiKart baslik="Ort. Yanıt" deger={kpi.ortSure ? `${kpi.ortSure} dk` : "—"} alt="ilk yanıt süresi" renk="#f59e0b" icon="⏱️" />
-              <KpiKart baslik="Bekleyen" deger={kpi.bekleyen} alt="yanıt bekliyor" renk="#ef4444" icon="🚨" />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20, marginBottom: 20 }}>
-              <div style={{ background: "linear-gradient(135deg,#0f172a,#1e293b)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Günlük Mesaj Trendi</div>
-                <div style={{ color: "#64748b", fontSize: 11, fontFamily: "monospace", marginBottom: 20 }}>Gelen · Cevaplanan · Cevapsız</div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={gunluk}>
-                    <defs>
-                      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
-                      <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#25D366" stopOpacity={0.3}/><stop offset="95%" stopColor="#25D366" stopOpacity={0}/></linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="gun" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="gelen" name="Gelen" stroke="#3b82f6" strokeWidth={2} fill="url(#g1)" />
-                    <Area type="monotone" dataKey="cevaplanan" name="Cevaplanan" stroke="#25D366" strokeWidth={2} fill="url(#g2)" />
-                    <Area type="monotone" dataKey="cevapsiz" name="Cevapsız" stroke="#ef4444" strokeWidth={1.5} fill="none" strokeDasharray="4 4" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div style={{ background: "linear-gradient(135deg,#0f172a,#1e293b)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Kategori Dağılımı</div>
-                <div style={{ color: "#64748b", fontSize: 11, fontFamily: "monospace", marginBottom: 16 }}>Konuşma türlerine göre</div>
-                <ResponsiveContainer width="100%" height={160}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+        <KpiKart baslik="Bugün Gelen"    deger={kpi.bugunGelen}       alt="yeni konuşma"   renk="#16a34a" icon="💬" />
+        <KpiKart baslik="Bu Hafta"       deger={kpi.haftaGelen}       alt="toplam konuşma" renk="#0891b2" icon="📅" />
+        <KpiKart baslik="Bekleyen"       deger={kpi.bekleyen}         alt="yanıt bekliyor" renk="#ef4444" icon="⏳" />
+        <KpiKart baslik="Kapanma Oranı"  deger={"%" + kpi.kapanmaOrani} alt={kpi.satis + " satış"} renk="#f59e0b" icon="✅" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20 }}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 2 }}>Günlük Konuşma Trendi</div>
+          <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 20 }}>Gelen · Kapanan · Satış</div>
+          {yukleniyor ? <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={gunluk}>
+                <defs>
+                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15}/><stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="gun" tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="gelen"   name="Gelen"   stroke="#16a34a" strokeWidth={2} fill="url(#g1)" />
+                <Area type="monotone" dataKey="kapanan" name="Kapanan" stroke="#0891b2" strokeWidth={1.5} fill="none" />
+                <Area type="monotone" dataKey="satis"   name="Satış"   stroke="#f59e0b" strokeWidth={1.5} fill="none" strokeDasharray="4 4" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 2 }}>Kategori Dağılımı</div>
+          <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 16 }}>Konuşma türleri</div>
+          {kategoriler.length === 0
+            ? <div style={{ color: "#9ca3af", textAlign: "center", padding: "40px 0", fontSize: 13 }}>Henüz veri yok</div>
+            : <>
+                <ResponsiveContainer width="100%" height={150}>
                   <PieChart>
-                    <Pie data={kategoriler} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="value">
+                    <Pie data={kategoriler} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
                       {kategoriler.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
-                    <Tooltip formatter={(v) => [`%${v}`,""]} contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip formatter={v => ["%" + v, ""]} contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
@@ -145,106 +416,225 @@ export default function App() {
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ width: 8, height: 8, borderRadius: "50%", background: k.color }} />
-                        <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{k.name}</span>
+                        <span style={{ fontSize: 11, color: "#6b7280" }}>{k.name}</span>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: k.color, fontFamily: "monospace" }}>%{k.value}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: k.color }}>%{k.value}</span>
                     </div>
                   ))}
                 </div>
+              </>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PROFIL ──────────────────────────────────────────────────────────────────
+function Profil({ profil }) {
+  const [ad, setAd]         = useState(profil?.ad || "");
+  const [soyad, setSoyad]   = useState(profil?.soyad || "");
+  const [yeniSifre, setYeniSifre]   = useState("");
+  const [yeniSifre2, setYeniSifre2] = useState("");
+  const [sekme, setSekme]   = useState("profil");
+  const [mesaj, setMesaj]   = useState(null);
+  const [kaydediyor, setKaydediyor] = useState(false);
+
+  function bildir(tip, msg) { setMesaj({ tip, msg }); setTimeout(() => setMesaj(null), 3000); }
+
+  async function profilKaydet(e) {
+    e.preventDefault(); setKaydediyor(true);
+    try { await profilGuncelle(profil.id, { ad, soyad }); bildir("basari", "Profil güncellendi."); }
+    catch { bildir("hata", "Güncelleme başarısız."); }
+    finally { setKaydediyor(false); }
+  }
+
+  async function sifreDegistir(e) {
+    e.preventDefault();
+    if (yeniSifre !== yeniSifre2) { bildir("hata", "Şifreler eşleşmiyor."); return; }
+    if (yeniSifre.length < 8) { bildir("hata", "En az 8 karakter olmalı."); return; }
+    setKaydediyor(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: yeniSifre });
+      if (error) throw error;
+      bildir("basari", "Şifre güncellendi."); setYeniSifre(""); setYeniSifre2("");
+    } catch (err) { bildir("hata", err.message); }
+    finally { setKaydediyor(false); }
+  }
+
+  const ROL = { super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" };
+  const DURUM_RENK = { aktif: "#16a34a", izinde: "#f59e0b", pasif: "#ef4444" };
+
+  return (
+    <div style={{ padding: "28px 32px", maxWidth: 600 }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 24 }}>Profil</h1>
+      {mesaj && (
+        <div style={{ padding: "10px 16px", borderRadius: 8, marginBottom: 20, fontSize: 13, fontWeight: 500,
+          background: mesaj.tip === "basari" ? "#dcfce7" : "#fef2f2",
+          border: "1px solid " + (mesaj.tip === "basari" ? "#bbf7d0" : "#fecaca"),
+          color: mesaj.tip === "basari" ? "#15803d" : "#dc2626" }}>
+          {mesaj.tip === "basari" ? "✅" : "❌"} {mesaj.msg}
+        </div>
+      )}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 20 }}>
+            {(profil?.ad || "?").charAt(0)}
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{profil?.ad} {profil?.soyad}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", padding: "2px 10px", borderRadius: 20 }}>{ROL[profil?.rol] || profil?.rol}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: DURUM_RENK[profil?.durum], background: DURUM_RENK[profil?.durum] + "15", padding: "2px 10px", borderRadius: 20 }}>
+                {profil?.durum}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #f3f4f6", marginBottom: 20 }}>
+          {[["profil","Profil Bilgileri"],["sifre","Şifre Değiştir"]].map(([k, l]) => (
+            <button key={k} onClick={() => setSekme(k)}
+              style={{ padding: "8px 16px", border: "none", background: "transparent", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                color: sekme === k ? "#16a34a" : "#6b7280", borderBottom: "2px solid " + (sekme === k ? "#16a34a" : "transparent") }}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {sekme === "profil" ? (
+          <form onSubmit={profilKaydet}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              {[["Ad", ad, setAd], ["Soyad", soyad, setSoyad]].map(([label, val, setter]) => (
+                <div key={label}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
+                  <input value={val} onChange={e => setter(e.target.value)} required
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+                </div>
+              ))}
+            </div>
+            <button type="submit" disabled={kaydediyor}
+              style={{ padding: "10px 24px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", opacity: kaydediyor ? 0.7 : 1 }}>
+              {kaydediyor ? "Kaydediliyor..." : "Kaydet"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={sifreDegistir}>
+            {[["Yeni Şifre", yeniSifre, setYeniSifre, "En az 8 karakter"], ["Tekrar", yeniSifre2, setYeniSifre2, "Şifreyi tekrarla"]].map(([label, val, setter, ph]) => (
+              <div key={label} style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
+                <input type="password" value={val} onChange={e => setter(e.target.value)} required placeholder={ph}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+              </div>
+            ))}
+            <button type="submit" disabled={kaydediyor}
+              style={{ padding: "10px 24px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", opacity: kaydediyor ? 0.7 : 1 }}>
+              {kaydediyor ? "Güncelleniyor..." : "Şifreyi Güncelle"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ANA APP ────────────────────────────────────────────────────────────────
+const MENU = [
+  { key: "dashboard", label: "📊 Dashboard" },
+  { key: "inbox",     label: "💬 Inbox"     },
+  { key: "profil",    label: "👤 Profil"    },
+];
+
+export default function App() {
+  const [kullanici, setKullanici]   = useState(null);
+  const [profil, setProfil]         = useState(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [aktifSayfa, setAktifSayfa] = useState("dashboard");
+  const [aktifKonusma, setAktifKonusma] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
+      setYukleniyor(false);
+    }).catch(() => setYukleniyor(false));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
+      else if (event === "SIGNED_OUT") { setKullanici(null); setProfil(null); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function profilYukle(userId) {
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+      setProfil(data);
+    } catch {}
+  }
+
+  if (yukleniyor) return (
+    <>
+      <style>{GLOBAL_STYLE}</style>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 36, height: 36, border: "3px solid #e5e7eb", borderTop: "3px solid #16a34a", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+          <p style={{ color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</p>
+        </div>
+      </div>
+    </>
+  );
+
+  if (!kullanici) return <><style>{GLOBAL_STYLE}</style><Login /></>;
+
+  return (
+    <>
+      <style>{GLOBAL_STYLE}</style>
+      <div style={{ display: "flex", height: "100vh" }}>
+        {/* Sidebar */}
+        <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #f3f4f6" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>💬</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: "#111827" }}>Metal Reyonu</div>
+                <div style={{ fontSize: 10, color: "#9ca3af" }}>WhatsApp Yönetim</div>
               </div>
             </div>
-
-            <div style={{ background: "linear-gradient(135deg,#0f172a,#1e293b)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Saatlik Yoğunluk</div>
-              <div style={{ color: "#64748b", fontSize: 11, fontFamily: "monospace", marginBottom: 20 }}>Hangi saatlerde en çok mesaj geliyor?</div>
-              <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={SAATLIK} barSize={22}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="saat" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}:00`} />
-                  <YAxis hide />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="mesaj" name="Mesaj" radius={[4,4,0,0]}>
-                    {SAATLIK.map((e, i) => <Cell key={i} fill={e.mesaj >= 20 ? "#3b82f6" : e.mesaj >= 12 ? "#0891b2" : "#1e3a5f"} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </div>
-        )}
-
-        {/* BEKLEYENlER */}
-        {sekme === "bekleyenler" && (
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Bekleyen Konuşmalar</h1>
-            <p style={{ color: "#64748b", fontSize: 12, fontFamily: "monospace", marginBottom: 24 }}>En uzun bekleyenden sıralı · {bekleyenler.length} bekleyen</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {bekleyenler.length === 0 && <div style={{ color: "#64748b", textAlign: "center", padding: 40 }}>🎉 Bekleyen konuşma yok</div>}
-              {bekleyenler.map((b) => (
-                <div key={b.id} style={{ background: b.oncelik === "kritik" ? "linear-gradient(135deg,#1a0a0a,#1e1010)" : "linear-gradient(135deg,#0f172a,#1e293b)", border: `1px solid ${b.oncelik === "kritik" ? "rgba(239,68,68,0.25)" : b.oncelik === "yuksek" ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ fontSize: 22 }}>{b.oncelik === "kritik" ? "🔴" : b.oncelik === "yuksek" ? "🟠" : "🟡"}</div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{b.musteri}</div>
-                      <div style={{ color: "#64748b", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{b.telefon}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace", marginBottom: 2 }}>KATEGORİ</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{b.kategori}</div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace", marginBottom: 2 }}>BEKLİYOR</div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: b.oncelik === "kritik" ? "#ef4444" : b.oncelik === "yuksek" ? "#f97316" : "#f59e0b", fontFamily: "monospace" }}>{b.sure}</div>
-                    </div>
-                    <OncelikBadge oncelik={b.oncelik} />
-                  </div>
-                </div>
-              ))}
+          <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {MENU.map(item => (
+              <button key={item.key} onClick={() => { setAktifSayfa(item.key); setAktifKonusma(null); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aktifSayfa === item.key ? 600 : 500, textAlign: "left", width: "100%",
+                  background: aktifSayfa === item.key ? "#dcfce7" : "transparent",
+                  color: aktifSayfa === item.key ? "#16a34a" : "#6b7280" }}>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div style={{ padding: "12px 16px", borderTop: "1px solid #f3f4f6" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 13 }}>
+                {profil?.ad?.charAt(0) || "?"}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>{profil?.ad} {profil?.soyad}</div>
+                <div style={{ fontSize: 10, color: "#9ca3af" }}>{{ super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" }[profil?.rol]}</div>
+              </div>
             </div>
+            <button onClick={() => cikisYap()}
+              style={{ width: "100%", padding: 7, borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
+              Çıkış Yap
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* TEMSİLCİLER */}
-        {sekme === "temsilciler" && (
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Temsilci Performansı</h1>
-            <p style={{ color: "#64748b", fontSize: 12, fontFamily: "monospace", marginBottom: 24 }}>Tag eşlemesine göre</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {temsilciler.length === 0 && <div style={{ color: "#64748b", textAlign: "center", padding: 40 }}>Henüz veri yok</div>}
-              {temsilciler.map((t, i) => (
-                <div key={i} style={{ background: "linear-gradient(135deg,#0f172a,#1e293b)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "20px 24px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: t.oran > 0 ? 16 : 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, color: "#93c5fd" }}>{t.ad.charAt(0)}</div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{t.ad}</div>
-                        <div style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace", marginTop: 1 }}>{t.atanan} konuşma atandı</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 24 }}>
-                      {[
-                        { label: "Cevaplayan", val: t.cevaplayan, color: "#25D366" },
-                        { label: "Ort. Süre", val: t.ort_sure ? `${t.ort_sure} dk` : "—", color: t.ort_sure > 30 ? "#ef4444" : "#f59e0b" },
-                        { label: "Yanıt Oranı", val: `%${t.oran}`, color: t.oran > 90 ? "#25D366" : t.oran > 80 ? "#f59e0b" : "#ef4444" },
-                      ].map((m, j) => (
-                        <div key={j} style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{m.label}</div>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: m.color, fontFamily: "monospace" }}>{m.val}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {t.oran > 0 && (
-                    <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${t.oran}%`, background: t.oran > 90 ? "#25D366" : t.oran > 80 ? "#f59e0b" : "#ef4444", borderRadius: 4 }} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* İçerik */}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {aktifKonusma
+            ? <Sohbet konusmaId={aktifKonusma} profil={profil} onGeri={() => { setAktifKonusma(null); setAktifSayfa("inbox"); }} />
+            : aktifSayfa === "dashboard" ? <Dashboard profil={profil} />
+            : aktifSayfa === "inbox"     ? <Inbox profil={profil} onSohbetAc={id => setAktifKonusma(id)} />
+            : aktifSayfa === "profil"    ? <Profil profil={profil} />
+            : null}
+        </div>
       </div>
     </>
   );
