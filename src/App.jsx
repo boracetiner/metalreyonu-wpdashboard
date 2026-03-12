@@ -919,14 +919,15 @@ export default function App() {
   const [aktifKonusma, setAktifKonusma] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
-      setYukleniyor(false);
-    }).catch(() => setYukleniyor(false));
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
-      else if (event === "SIGNED_OUT") { setKullanici(null); setProfil(null); }
+      if (session?.user) {
+        setKullanici(session.user);
+        await profilYukle(session.user.id);
+      } else {
+        setKullanici(null);
+        setProfil(null);
+      }
+      setYukleniyor(false);
     });
     return () => subscription.unsubscribe();
   }, []);
