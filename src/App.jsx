@@ -919,17 +919,22 @@ export default function App() {
   const [aktifKonusma, setAktifKonusma] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
+      } catch(e) { console.error(e); }
+      finally { if (mounted) setYukleniyor(false); }
+    }
+    init();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setKullanici(session.user);
-        await profilYukle(session.user.id);
-      } else {
-        setKullanici(null);
-        setProfil(null);
-      }
-      setYukleniyor(false);
+      if (!mounted) return;
+      if (event === "SIGNED_IN" && session?.user) { setKullanici(session.user); await profilYukle(session.user.id); setYukleniyor(false); }
+      else if (event === "SIGNED_OUT") { setKullanici(null); setProfil(null); }
     });
-    return () => subscription.unsubscribe();
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   async function profilYukle(userId) {
