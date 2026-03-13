@@ -900,6 +900,141 @@ function HazirYanitlar({ profil }) {
   );
 }
 
+
+// ── TEMSİLCİ YÖNETİMİ ──────────────────────────────────────────────────────
+function TemsilciYonetimi({ profil }) {
+  const [temsilciler, setTemsilciler] = useState([]);
+  const [yukleniyor, setYukleniyor]   = useState(true);
+  const [modal, setModal]             = useState(null);
+  const [mesaj, setMesaj]             = useState(null);
+
+  useEffect(() => { yukle(); }, []);
+
+  async function yukle() {
+    setYukleniyor(true);
+    const data = await getTemsilciler();
+    setTemsilciler(data); setYukleniyor(false);
+  }
+
+  function bildir(tip, msg) { setMesaj({ tip, msg }); setTimeout(() => setMesaj(null), 3000); }
+
+  async function durumDegistir(id, yeniDurum) {
+    try { await profilGuncelle(id, { durum: yeniDurum }); bildir("basari", "Durum güncellendi."); setModal(null); yukle(); }
+    catch { bildir("hata", "Güncelleme başarısız."); }
+  }
+
+  async function rolDegistir(id, yeniRol) {
+    try { await profilGuncelle(id, { rol: yeniRol }); bildir("basari", "Rol güncellendi."); setModal(null); yukle(); }
+    catch { bildir("hata", "Güncelleme başarısız."); }
+  }
+
+  const ROL_ETIKET  = { super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" };
+  const DURUM_RENK  = { aktif: "#16a34a", izinde: "#f59e0b", pasif: "#ef4444" };
+  const DURUM_ETIKET = { aktif: "🟢 Aktif", izinde: "🏖️ İzinde", pasif: "⛔ Pasif" };
+
+  return (
+    <div style={{ padding: "28px 32px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Temsilci Yönetimi</h1>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>{temsilciler.length} kullanıcı</p>
+        </div>
+        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", fontSize: 12, color: "#6b7280" }}>
+          💡 Yeni kullanıcı eklemek için Supabase → Authentication → Users
+        </div>
+      </div>
+
+      {mesaj && (
+        <div style={{ padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 500,
+          background: mesaj.tip === "basari" ? "#dcfce7" : "#fef2f2",
+          border: "1px solid " + (mesaj.tip === "basari" ? "#bbf7d0" : "#fecaca"),
+          color: mesaj.tip === "basari" ? "#15803d" : "#dc2626" }}>
+          {mesaj.tip === "basari" ? "✅" : "❌"} {mesaj.msg}
+        </div>
+      )}
+
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+        : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {temsilciler.map(t => (
+              <div key={t.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 16 }}>
+                    {t.ad?.charAt(0) || "?"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{t.ad} {t.soyad}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{ROL_ETIKET[t.rol] || t.rol}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: DURUM_RENK[t.durum] || "#6b7280", background: (DURUM_RENK[t.durum] || "#6b7280") + "15", padding: "4px 12px", borderRadius: 20 }}>
+                    {DURUM_ETIKET[t.durum] || t.durum}
+                  </span>
+                  {t.id !== profil?.id && (
+                    <>
+                      <button onClick={() => setModal({ tip: "durum", veri: t })}
+                        style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
+                        Durum
+                      </button>
+                      <button onClick={() => setModal({ tip: "rol", veri: t })}
+                        style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
+                        Rol
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#111827", marginBottom: 4 }}>
+              {modal.tip === "durum" ? "Durum Değiştir" : "Rol Değiştir"}
+            </div>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 20 }}>{modal.veri.ad} {modal.veri.soyad}</div>
+
+            {modal.tip === "durum" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {Object.entries(DURUM_ETIKET).map(([key, label]) => (
+                  <button key={key} onClick={() => durumDegistir(modal.veri.id, key)}
+                    style={{ padding: "12px 16px", borderRadius: 8, border: "2px solid " + (modal.veri.durum === key ? DURUM_RENK[key] : "#e5e7eb"),
+                      background: modal.veri.durum === key ? DURUM_RENK[key] + "10" : "#fff",
+                      color: "#111827", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {modal.tip === "rol" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {Object.entries(ROL_ETIKET).map(([key, label]) => (
+                  <button key={key} onClick={() => rolDegistir(modal.veri.id, key)}
+                    style={{ padding: "12px 16px", borderRadius: 8, border: "2px solid " + (modal.veri.rol === key ? "#16a34a" : "#e5e7eb"),
+                      background: modal.veri.rol === key ? "#dcfce7" : "#fff",
+                      color: "#111827", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button onClick={() => setModal(null)}
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 13, cursor: "pointer" }}>
+              İptal
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ANA APP ────────────────────────────────────────────────────────────────
 const MENU = [
   { key: "dashboard",        label: "📊 Dashboard",        roller: ["super_admin","admin","temsilci"] },
@@ -908,6 +1043,7 @@ const MENU = [
   { key: "performans",       label: "📈 Performans",        roller: ["super_admin","admin"] },
   { key: "kategori",         label: "🏷️ Kategoriler",       roller: ["super_admin","admin"] },
   { key: "hazir_yanitlar",   label: "⚡ Hazır Yanıtlar",    roller: ["super_admin","admin","temsilci"] },
+  { key: "temsilci_yonetimi", label: "👥 Temsilciler",      roller: ["super_admin","admin"] },
   { key: "profil",           label: "👤 Profil",            roller: ["super_admin","admin","temsilci"] },
 ];
 
@@ -1010,6 +1146,7 @@ export default function App() {
             : aktifSayfa === "performans"     ? <PerformansRaporu profil={profil} />
             : aktifSayfa === "kategori"       ? <KategoriYonetimi profil={profil} />
             : aktifSayfa === "hazir_yanitlar" ? <HazirYanitlar profil={profil} />
+            : aktifSayfa === "temsilci_yonetimi" ? <TemsilciYonetimi profil={profil} />
             : aktifSayfa === "profil"         ? <Profil profil={profil} />
             : null}
         </div>
