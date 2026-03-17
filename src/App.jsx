@@ -159,10 +159,16 @@ function Sohbet({ konusmaId, profil, onGeri }) {
             <div style={{ fontSize: 11, color: "#9ca3af" }}>{konusma.contact_phone} · {konusma.category?.replace(/_/g, " ")}</div>
           </div>
         </div>
-        <button onClick={() => setSonucModal(true)}
-          style={{ padding: "8px 16px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
-          ✕ Kapat
-        </button>
+        {konusma.assigned_agent ? (
+          <button onClick={() => setSonucModal(true)}
+            style={{ padding: "8px 16px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
+            ✕ Kapat
+          </button>
+        ) : (
+          <div style={{ fontSize: 12, color: "#f59e0b", background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 14px", fontWeight: 600 }}>
+            ⚠️ Önce temsilci atanmalı
+          </div>
+        )}
       </div>
 
       {konusma.onceki_sonuc && (
@@ -341,14 +347,20 @@ function Inbox({ profil, onSohbetAc }) {
           ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
           : liste.length === 0
             ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Konuşma bulunamadı</div>
-            : liste.map(k => {
+            : [...liste].sort((a, b) => {
+                if (profil?.rol !== "temsilci") return 0;
+                const aK = a.assigned_agent === profil?.id;
+                const bK = b.assigned_agent === profil?.id;
+                return aK === bK ? 0 : aK ? -1 : 1;
+              }).map(k => {
                 const isim = k.contact_name || k.contact_phone || "Bilinmiyor";
                 const d = DURUM[k.status] || { label: k.status, renk: "#6b7280" };
+                const benim = k.assigned_agent === profil?.id;
                 return (
                   <div key={k.id} onClick={() => onSohbetAc(k.id)}
-                    style={{ padding: "14px 20px", borderBottom: "1px solid #f9fafb", cursor: "pointer" }}
+                    style={{ padding: "14px 20px", borderBottom: "1px solid #f9fafb", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                    onMouseLeave={e => e.currentTarget.style.background = benim ? "#f0fdf4" : "#fff"}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>
                         {isim.charAt(0).toUpperCase()}
@@ -360,18 +372,18 @@ function Inbox({ profil, onSohbetAc }) {
                             {sure(k.last_message_at)}
                           </span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, color: "#9ca3af", flex: 1 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11, color: "#9ca3af", flex: 1, minWidth: 60 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
                           {k.assigned_profile ? (
-                            <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 7px", borderRadius: 4 }}>
-                              👤 {k.assigned_profile.ad} {k.assigned_profile.soyad}
+                            <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
+                              👤 {k.assigned_profile.ad}
                             </span>
                           ) : (
-                            <span style={{ fontSize: 10, color: "#f59e0b", background: "#fffbeb", padding: "1px 7px", borderRadius: 4 }}>
+                            <span style={{ fontSize: 10, color: "#f59e0b", background: "#fffbeb", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
                               ⏳ Atanmamış
                             </span>
                           )}
-                          <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "1px 7px", borderRadius: 4 }}>{d.label}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>{d.label}</span>
                         </div>
                       </div>
                     </div>
@@ -1174,7 +1186,14 @@ function Raporlama({ profil }) {
       .order("created_at", { ascending: false });
 
     if (statü !== "all") query = query.eq("status", statü);
-    if (temsilci !== "all") query = query.eq("assigned_agent", temsilci);
+    // Temsilci rolü sadece kendi verilerini görebilir
+    if (profil?.rol === "temsilci") {
+      query = query.eq("assigned_agent", profil.id);
+    } else if (temsilci === "unassigned") {
+      query = query.is("assigned_agent", null);
+    } else if (temsilci !== "all") {
+      query = query.eq("assigned_agent", temsilci);
+    }
 
     const { data } = await query;
     setKonusmalar(data || []);
@@ -1248,15 +1267,17 @@ function Raporlama({ profil }) {
               <option value="kapali">Kapalı</option>
             </select>
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Temsilci</label>
-            <select value={temsilci} onChange={e => setTemsilci(e.target.value)}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none", background: "#fff" }}>
-              <option value="all">Tümü</option>
-              <option value="unassigned">Atanmamış</option>
-              {temsilciler.map(t => <option key={t.id} value={t.id}>{t.ad} {t.soyad}</option>)}
-            </select>
-          </div>
+          {profil?.rol !== "temsilci" && (
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Temsilci</label>
+              <select value={temsilci} onChange={e => setTemsilci(e.target.value)}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none", background: "#fff" }}>
+                <option value="all">Tümü</option>
+                <option value="unassigned">Atanmamış</option>
+                {temsilciler.map(t => <option key={t.id} value={t.id}>{t.ad} {t.soyad}</option>)}
+              </select>
+            </div>
+          )}
           <button onClick={ara}
             style={{ padding: "9px 20px", borderRadius: 8, background: "#111827", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer" }}>
             Ara
@@ -1335,7 +1356,7 @@ const MENU = [
   { key: "kategori",         label: "🏷️ Kategoriler",       roller: ["super_admin","admin"] },
   { key: "hazir_yanitlar",   label: "⚡ Hazır Yanıtlar",    roller: ["super_admin","admin","temsilci"] },
   { key: "temsilci_yonetimi", label: "👥 Temsilciler",      roller: ["super_admin","admin"] },
-  { key: "raporlama",         label: "📋 Raporlama",         roller: ["super_admin","admin"] },
+  { key: "raporlama",         label: "📋 Raporlama",         roller: ["super_admin","admin","temsilci"] },
   { key: "profil",           label: "👤 Profil",            roller: ["super_admin","admin","temsilci"] },
 ];
 
