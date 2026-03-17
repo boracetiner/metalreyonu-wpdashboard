@@ -126,8 +126,16 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 
   async function kapat(sonucKey) {
     const s = SONUCLAR.find(x => x.key === sonucKey);
-    await konusmaGuncelle(konusmaId, { sonuc: sonucKey, sonuc_guncellendi: new Date().toISOString(), sonuc_guncelleyen: profil?.id, status: s?.kapat ? "kapali" : "beklemede" });
-    setSonucModal(false); onGeri();
+    try {
+      const { error } = await supabase.from("conversations").update({
+        sonuc: sonucKey,
+        sonuc_guncellendi: new Date().toISOString(),
+        sonuc_guncelleyen: profil?.id,
+        status: s?.kapat ? "kapali" : "beklemede"
+      }).eq("id", konusmaId);
+      if (error) { alert("Hata: " + error.message); return; }
+      setSonucModal(false); onGeri();
+    } catch(e) { alert("Hata: " + e.message); }
   }
 
   if (!konusma) return <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>;
@@ -311,6 +319,11 @@ function Inbox({ profil, onSohbetAc }) {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontSize: 11, color: "#9ca3af", flex: 1 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
+                          {k.assigned_profile && (
+                            <span style={{ fontSize: 10, color: "#6b7280", background: "#f3f4f6", padding: "1px 7px", borderRadius: 4 }}>
+                              👤 {k.assigned_profile.ad}
+                            </span>
+                          )}
                           <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "1px 7px", borderRadius: 4 }}>{d.label}</span>
                         </div>
                       </div>
@@ -349,6 +362,52 @@ const CustomTooltip = ({ active, payload, label }) => {
     </div>
   );
 };
+
+function OzetBant({ profil }) {
+  const [ozet, setOzet] = useState({ benim: 0, bekleyen: 0, bugun: 0 });
+
+  useEffect(() => {
+    async function yukle() {
+      const bugun = new Date(); bugun.setHours(0,0,0,0);
+      const [{ data: benim }, { data: bekleyen }, { data: bugunKonusmalar }] = await Promise.all([
+        supabase.from("conversations").select("id", { count: "exact" }).eq("assigned_agent", profil?.id).eq("status", "open"),
+        supabase.from("conversations").select("id", { count: "exact" }).is("assigned_agent", null).eq("status", "open"),
+        supabase.from("conversations").select("id", { count: "exact" }).gte("created_at", bugun.toISOString())
+      ]);
+      setOzet({ benim: benim?.length || 0, bekleyen: bekleyen?.length || 0, bugun: bugunKonusmalar?.length || 0 });
+    }
+    if (profil?.id) yukle();
+  }, [profil]);
+
+  const ROL = { super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" };
+
+  return (
+    <div style={{ background: "linear-gradient(135deg,#16a34a,#15803d)", padding: "12px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
+          {profil?.ad?.charAt(0) || "?"}
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{profil?.ad} {profil?.soyad}</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{ROL[profil?.rol] || profil?.rol}</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 24 }}>
+        {[
+          { label: "Bende Açık", val: ozet.benim, icon: "💬" },
+          { label: "Atanmamış", val: ozet.bekleyen, icon: "⏳" },
+          { label: "Bugün Gelen", val: ozet.bugun, icon: "📅" },
+        ].map((m, i) => (
+          <div key={i} style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginBottom: 2 }}>{m.icon} {m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{m.val}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ width: 120 }} />
+    </div>
+  );
+}
 
 function Dashboard({ profil }) {
   const [kpi, setKpi]               = useState({ bugunGelen: 0, haftaGelen: 0, bekleyen: 0, satis: 0, kapanmaOrani: 0 });
@@ -550,8 +609,14 @@ function AtamaKuyrugu({ profil }) {
   }
 
   async function atamaYap(konusmaId) {
-    await supabase.from("conversations").update({ assigned_agent: profil.id }).eq("id", konusmaId);
-    yukle();
+    try {
+      const { error } = await supabase.from("conversations").update({ 
+        assigned_agent: profil.id,
+        status: "open"
+      }).eq("id", konusmaId);
+      if (error) { alert("Hata: " + error.message); return; }
+      yukle();
+    } catch(e) { alert("Hata: " + e.message); }
   }
 
   function sure(tarih) {
@@ -1137,7 +1202,9 @@ export default function App() {
         </div>
 
         {/* İçerik */}
-        <div style={{ flex: 1, overflow: "auto" }}>
+        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+          <OzetBant profil={profil} />
+          <div style={{ flex: 1, overflow: "auto" }}>
           {aktifKonusma
             ? <Sohbet konusmaId={aktifKonusma} profil={profil} onGeri={() => { setAktifKonusma(null); setAktifSayfa("inbox"); }} />
             : aktifSayfa === "dashboard"      ? <Dashboard profil={profil} />
@@ -1149,6 +1216,7 @@ export default function App() {
             : aktifSayfa === "temsilci_yonetimi" ? <TemsilciYonetimi profil={profil} />
             : aktifSayfa === "profil"         ? <Profil profil={profil} />
             : null}
+          </div>
         </div>
       </div>
     </>
