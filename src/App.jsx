@@ -120,10 +120,22 @@ function Sohbet({ konusmaId, profil, onGeri }) {
   async function gonder() {
     if (!metin.trim() || gonderiyor) return;
     setGonderiyor(true);
+    const metinKopya = metin;
+    const notModuKopya = notModu;
+    setMetin(""); setHazirOneri([]);
+    const gecici = {
+      id: "gecici-" + Date.now(),
+      direction: notModuKopya ? "note" : "outbound",
+      message_text: metinKopya,
+      sent_at: new Date().toISOString()
+    };
+    setMesajlar(prev => [...prev, gecici]);
     try {
-      await mesajGonder({ phone: konusma.contact_phone, message: metin, conversation_id: konusmaId, agent_id: profil?.id, is_note: notModu });
-      setMetin(""); setHazirOneri([]);
-    } catch (err) { alert("Hata: " + err.message); }
+      await mesajGonder({ phone: konusma.contact_phone, message: metinKopya, conversation_id: konusmaId, agent_id: profil?.id, is_note: notModuKopya });
+    } catch (err) {
+      setMesajlar(prev => prev.filter(m => m.id !== gecici.id));
+      alert("Hata: " + err.message);
+    }
     finally { setGonderiyor(false); }
   }
 
@@ -1370,12 +1382,13 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     async function init() {
+      const timeout = setTimeout(() => { if (mounted) setYukleniyor(false); }, 3000);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
         if (session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
       } catch(e) { console.error(e); }
-      finally { if (mounted) setYukleniyor(false); }
+      finally { clearTimeout(timeout); if (mounted) setYukleniyor(false); }
     }
     init();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
