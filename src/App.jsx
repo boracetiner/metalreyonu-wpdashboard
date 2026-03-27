@@ -300,17 +300,33 @@ function Inbox({ profil, onSohbetAc }) {
   const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {
-    yukle();
+    yukle(true);
     const ch = supabase.channel("inbox-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, yukle)
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        yukle(false);
+        sesCaldir();
+      })
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [filtre]);
 
-  async function yukle() {
-    setYukleniyor(true);
-    let statusFiltre = filtre;
-    if (filtre === "active") statusFiltre = undefined; // sonra manuel filtre
+  function sesCaldir() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+  }
+
+  async function yukle(spinner = true) {
+    if (spinner) setYukleniyor(true);
     const data = await getKonusmalar({ status: filtre === "all" || filtre === "active" ? undefined : filtre });
     if (filtre === "active") {
       setKonusmalar((data || []).filter(k => k.status === "open" || k.status === "beklemede"));
