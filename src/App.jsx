@@ -95,7 +95,14 @@ function Sohbet({ konusmaId, profil, onGeri }) {
     yukle();
     const ch = supabase.channel("sohbet-" + konusmaId)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "conversation_id=eq." + konusmaId },
-        p => setMesajlar(prev => [...prev, p.new]))
+        p => {
+          // Geçici mesajı gerçekle değiştir veya yeni ekle
+          setMesajlar(prev => {
+            const geciciVar = prev.find(m => m.id?.startsWith("gecici-") && m.message_text === p.new.message_text);
+            if (geciciVar) return prev.map(m => m.id === geciciVar.id ? p.new : m);
+            return [...prev, p.new];
+          });
+        })
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [konusmaId]);
@@ -1397,20 +1404,16 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    async function init() {
-      const timeout = setTimeout(() => { if (mounted) setYukleniyor(false); }, 1500);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (session?.user) { setKullanici(session.user); await profilYukle(session.user.id); }
-      } catch(e) { console.error(e); }
-      finally { clearTimeout(timeout); if (mounted) setYukleniyor(false); }
-    }
-    init();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      if (event === "SIGNED_IN" && session?.user) { setKullanici(session.user); await profilYukle(session.user.id); setYukleniyor(false); }
-      else if (event === "SIGNED_OUT") { setKullanici(null); setProfil(null); }
+      if (session?.user) {
+        setKullanici(session.user);
+        await profilYukle(session.user.id);
+      } else {
+        setKullanici(null);
+        setProfil(null);
+      }
+      setYukleniyor(false);
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
