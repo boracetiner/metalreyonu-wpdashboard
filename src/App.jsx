@@ -1404,8 +1404,12 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
+    // 2 saniye içinde event gelmezse yüklemeyi bitir
+    const fallback = setTimeout(() => { if (mounted) setYukleniyor(false); }, 2000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+      clearTimeout(fallback);
       if (session?.user) {
         setKullanici(session.user);
         await profilYukle(session.user.id);
@@ -1415,7 +1419,7 @@ export default function App() {
       }
       setYukleniyor(false);
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { mounted = false; clearTimeout(fallback); subscription.unsubscribe(); };
   }, []);
 
   async function profilYukle(userId) {
