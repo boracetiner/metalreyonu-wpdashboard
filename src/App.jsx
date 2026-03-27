@@ -1391,14 +1391,14 @@ const MENU = [
 export default function App() {
   const [kullanici, setKullanici]   = useState(null);
   const [profil, setProfil]         = useState(null);
-  const [yukleniyor, setYukleniyor] = useState(true);
+  const [yukleniyor, setYukleniyor] = useState(false);
   const [aktifSayfa, setAktifSayfa] = useState("dashboard");
   const [aktifKonusma, setAktifKonusma] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     async function init() {
-      const timeout = setTimeout(() => { if (mounted) setYukleniyor(false); }, 3000);
+      const timeout = setTimeout(() => { if (mounted) setYukleniyor(false); }, 1500);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
