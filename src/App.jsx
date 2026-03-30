@@ -162,7 +162,7 @@ function Sohbet({ konusmaId, profil, onGeri }) {
     } catch(e) { alert("Hata: " + e.message); }
   }
 
-  if (!konusma) return <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>;
+  if (!konusma) return <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>;
   const isim = konusma.contact_name || konusma.contact_phone || "Bilinmiyor";
 
   return (
@@ -333,7 +333,7 @@ function Inbox({ profil, onSohbetAc }) {
   }
 
   async function yukle(spinner = true) {
-    if (spinner) setYukleniyor(true);
+    if (false) setYukleniyor(true); // spinner devre dışı
     const data = await getKonusmalar({ status: filtre === "all" || filtre === "active" ? undefined : filtre });
     if (filtre === "active") {
       setKonusmalar((data || []).filter(k => k.status === "open" || k.status === "beklemede"));
@@ -379,7 +379,7 @@ function Inbox({ profil, onSohbetAc }) {
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
         {yukleniyor
-          ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+          ? <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>
           : liste.length === 0
             ? <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>Konuşma bulunamadı</div>
             : [...liste].sort((a, b) => {
@@ -531,7 +531,7 @@ function Dashboard({ profil }) {
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 2 }}>Günlük Konuşma Trendi</div>
           <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 20 }}>Gelen · Kapanan · Satış</div>
-          {yukleniyor ? <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div> : (
+          {(
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={gunluk}>
                 <defs>
@@ -697,7 +697,7 @@ function AtamaKuyrugu({ profil }) {
   useEffect(() => { yukle(); }, []);
 
   async function yukle() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     const { data } = await supabase.from("conversations").select("*").eq("status", "open").is("assigned_agent", null).order("created_at", { ascending: true });
     setKonusmalar(data || []); setYukleniyor(false);
   }
@@ -726,7 +726,7 @@ function AtamaKuyrugu({ profil }) {
         <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Atama Kuyruğu</h1>
         <p style={{ fontSize: 13, color: "#6b7280" }}>Atanmamış {konusmalar.length} konuşma bekliyor</p>
       </div>
-      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>
         : konusmalar.length === 0 ? (
           <div style={{ textAlign: "center", padding: 60, background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
@@ -773,7 +773,7 @@ function PerformansRaporu({ profil }) {
   useEffect(() => { yukle(); }, [donem]);
 
   async function yukle() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     const gun = donem === "bugun" ? 1 : donem === "hafta" ? 7 : 30;
     const since = new Date(); since.setDate(since.getDate() - gun);
 
@@ -810,7 +810,7 @@ function PerformansRaporu({ profil }) {
           ))}
         </div>
       </div>
-      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>
         : temsilciler.length === 0 ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Temsilci bulunamadı</div>
         : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -862,7 +862,7 @@ function KategoriYonetimi({ profil }) {
   useEffect(() => { yukle(); }, []);
 
   async function yukle() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     const { data } = await supabase.from("kategoriler").select("*").order("isim");
     setKategoriler(data || []); setYukleniyor(false);
   }
@@ -923,7 +923,7 @@ function KategoriYonetimi({ profil }) {
         </form>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#e5e7eb", fontSize: 13 }}>―</div>
           : kategoriler.map(k => (
             <div key={k.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
@@ -969,7 +969,7 @@ function HazirYanitlar({ profil }) {
   useEffect(() => { yukle(); }, []);
 
   async function yukle() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     const { data } = await supabase.from("hazir_yanitlar").select("*").order("kisayol");
     setYanitlar(data || []); setYukleniyor(false);
   }
@@ -1032,7 +1032,7 @@ function HazirYanitlar({ profil }) {
         </form>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+        {yukleniyor ? <div style={{ textAlign: "center", padding: 30, color: "#e5e7eb", fontSize: 13 }}>―</div>
           : yanitlar.length === 0 ? <div style={{ textAlign: "center", padding: 30, color: "#9ca3af", fontSize: 13 }}>Henüz hazır yanıt yok</div>
           : yanitlar.map(y => (
             <div key={y.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
@@ -1070,7 +1070,7 @@ function TemsilciYonetimi({ profil }) {
   useEffect(() => { yukle(); }, []);
 
   async function yukle() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     const data = await getTemsilciler();
     setTemsilciler(data); setYukleniyor(false);
   }
@@ -1112,7 +1112,7 @@ function TemsilciYonetimi({ profil }) {
         </div>
       )}
 
-      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", fontSize: 13 }}>Yükleniyor...</div>
+      {yukleniyor ? <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>
         : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {temsilciler.map(t => (
@@ -1214,7 +1214,7 @@ function Raporlama({ profil }) {
   }, []);
 
   async function ara() {
-    setYukleniyor(true);
+    // veri yüklenirken spinner gösterme;
     let query = supabase.from("conversations").select("*, assigned_profile:profiles!conversations_assigned_agent_fkey(ad, soyad)")
       .gte("created_at", baslangic + "T00:00:00")
       .lte("created_at", bitis + "T23:59:59")
@@ -1404,22 +1404,47 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    // 2 saniye içinde event gelmezse yüklemeyi bitir
-    const fallback = setTimeout(() => { if (mounted) setYukleniyor(false); }, 2000);
+
+    async function baslat() {
+      // Önce mevcut session'ı kontrol et
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!mounted) return;
+        
+        if (error || !session) {
+          // Bozuk session varsa temizle
+          Object.keys(localStorage).forEach(k => {
+            if (k.includes('supabase') || k.includes('metalreyonu')) localStorage.removeItem(k);
+          });
+          setYukleniyor(false);
+          return;
+        }
+        
+        if (session?.user) {
+          setKullanici(session.user);
+          await profilYukle(session.user.id);
+        }
+        setYukleniyor(false);
+      } catch(e) {
+        if (mounted) setYukleniyor(false);
+      }
+    }
+
+    baslat();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      clearTimeout(fallback);
-      if (session?.user) {
+      if (event === "SIGNED_IN" && session?.user) {
         setKullanici(session.user);
         await profilYukle(session.user.id);
-      } else {
+        setYukleniyor(false);
+      } else if (event === "SIGNED_OUT") {
         setKullanici(null);
         setProfil(null);
+        setYukleniyor(false);
       }
-      setYukleniyor(false);
     });
-    return () => { mounted = false; clearTimeout(fallback); subscription.unsubscribe(); };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   async function profilYukle(userId) {
