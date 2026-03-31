@@ -41,7 +41,7 @@ export async function mevcutKullanici() {
 export async function getKonusmalar(filtre = {}) {
   let query = supabase
     .from('conversations')
-    .select('*')
+    .select('*, assigned_profile:profiles!conversations_assigned_agent_fkey(id, ad, soyad)')
     .order('last_message_at', { ascending: false })
 
   if (filtre.status)         query = query.eq('status', filtre.status)

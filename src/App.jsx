@@ -233,18 +233,24 @@ function Sohbet({ konusmaId, profil, onGeri }) {
           </div>
         )}
         {notModu && <div style={{ background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 6, padding: "6px 12px", marginBottom: 8, fontSize: 11, color: "#92400e", fontWeight: 600 }}>🔒 Not modu — müşteri görmez</div>}
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <textarea value={metin} onChange={e => metinDegistir(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); gonder(); } }}
-            placeholder={notModu ? "Dahili not yaz..." : "Mesaj yaz... (/ ile hazır yanıt)"}
-            rows={2} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), fontSize: 13, resize: "none", background: notModu ? "#fffbeb" : "#fff", outline: "none" }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <button onClick={() => setNotModu(!notModu)}
-              style={{ padding: "8px 10px", borderRadius: 7, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), background: notModu ? "#fffbeb" : "#fff", cursor: "pointer", fontSize: 14 }}>🔒</button>
-            <button onClick={gonder} disabled={!metin.trim() || gonderiyor}
-              style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (!metin.trim() || gonderiyor) ? 0.5 : 1 }}>↑</button>
+        {!konusma.assigned_agent ? (
+          <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 8, fontSize: 13, color: "#92400e", textAlign: "center" }}>
+            ⚠️ Cevap yazabilmek için önce bu sohbeti üstlenin veya bir temsilci atanmalı
           </div>
-        </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <textarea value={metin} onChange={e => metinDegistir(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); gonder(); } }}
+              placeholder={notModu ? "Dahili not yaz..." : "Mesaj yaz... (/ ile hazır yanıt)"}
+              rows={2} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), fontSize: 13, resize: "none", background: notModu ? "#fffbeb" : "#fff", outline: "none" }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button onClick={() => setNotModu(!notModu)}
+                style={{ padding: "8px 10px", borderRadius: 7, border: "1px solid " + (notModu ? "#fed7aa" : "#e5e7eb"), background: notModu ? "#fffbeb" : "#fff", cursor: "pointer", fontSize: 14 }}>🔒</button>
+              <button onClick={gonder} disabled={!metin.trim() || gonderiyor}
+                style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (!metin.trim() || gonderiyor) ? 0.5 : 1 }}>↑</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {sonucModal && (
@@ -411,7 +417,7 @@ function Inbox({ profil, onSohbetAc }) {
                           <span style={{ fontSize: 11, color: "#9ca3af", flex: 1, minWidth: 60 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
                           {k.assigned_profile ? (
                             <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
-                              👤 {k.assigned_profile.ad}
+                              👤 {k.assigned_profile.ad} {k.assigned_profile.soyad}
                             </span>
                           ) : (
                             <span style={{ fontSize: 10, color: "#f59e0b", background: "#fffbeb", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
