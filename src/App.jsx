@@ -310,7 +310,7 @@ function Inbox({ profil, onSohbetAc }) {
   const [konusmalar, setKonusmalar] = useState([]);
   const [filtre, setFiltre]         = useState("active");
   const [arama, setArama]           = useState("");
-  const [yukleniyor, setYukleniyor] = useState(true);
+  const [yukleniyor, setYukleniyor] = useState(false);
 
   function sesCaldir() {
     try {
