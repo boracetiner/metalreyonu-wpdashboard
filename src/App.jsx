@@ -312,17 +312,6 @@ function Inbox({ profil, onSohbetAc }) {
   const [arama, setArama]           = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
 
-  useEffect(() => {
-    yukle(true);
-    const ch = supabase.channel("inbox-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
-        yukle(false);
-        sesCaldir();
-      })
-      .subscribe();
-    return () => supabase.removeChannel(ch);
-  }, [filtre]);
-
   function sesCaldir() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -338,16 +327,24 @@ function Inbox({ profil, onSohbetAc }) {
     } catch(e) {}
   }
 
-  async function yukle(spinner = true) {
-    if (false) setYukleniyor(true); // spinner devre dışı
-    const data = await getKonusmalar({ status: filtre === "all" || filtre === "active" ? undefined : filtre });
-    if (filtre === "active") {
-      setKonusmalar((data || []).filter(k => k.status === "open" || k.status === "beklemede"));
-      setYukleniyor(false);
-      return;
+  useEffect(() => {
+    async function yukle() {
+      const data = await getKonusmalar({ status: filtre === "all" || filtre === "active" ? undefined : filtre });
+      if (filtre === "active") {
+        setKonusmalar((data || []).filter(k => k.status === "open" || k.status === "beklemede"));
+      } else {
+        setKonusmalar(data || []);
+      }
     }
-    setKonusmalar(data); setYukleniyor(false);
-  }
+    yukle();
+    const ch = supabase.channel("inbox-rt-" + filtre)
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        yukle();
+        sesCaldir();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [filtre]);
 
   const liste = konusmalar.filter(k => {
     if (!arama) return true;
@@ -1411,32 +1408,16 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    async function baslat() {
-      // Önce mevcut session'ı kontrol et
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!mounted) return;
-        
-        if (error || !session) {
-          // Bozuk session varsa temizle
-          Object.keys(localStorage).forEach(k => {
-            if (k.includes('supabase') || k.includes('metalreyonu')) localStorage.removeItem(k);
-          });
-          setYukleniyor(false);
-          return;
-        }
-        
-        if (session?.user) {
-          setKullanici(session.user);
-          await profilYukle(session.user.id);
-        }
-        setYukleniyor(false);
-      } catch(e) {
-        if (mounted) setYukleniyor(false);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setKullanici(session.user);
+        await profilYukle(session.user.id);
       }
-    }
-
-    baslat();
+      setYukleniyor(false);
+    }).catch(() => {
+      if (mounted) setYukleniyor(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;

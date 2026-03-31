@@ -8,8 +8,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
-    flowType: 'implicit',
-    storageKey: 'metalreyonu-auth'
+    storageKey: 'metalreyonu-auth',
+    lock: (name, acquireTimeout, fn) => fn()
   }
 })
 
