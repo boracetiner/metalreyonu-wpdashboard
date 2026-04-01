@@ -93,10 +93,9 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 
   useEffect(() => {
     yukle();
-    const ch = supabase.channel("sohbet-" + konusmaId)
+    const ch = supabase.channel("sohbet-msgs", { config: { broadcast: { self: true } } })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "conversation_id=eq." + konusmaId },
         p => {
-          // Geçici mesajı gerçekle değiştir veya yeni ekle
           setMesajlar(prev => {
             const geciciVar = prev.find(m => m.id?.startsWith("gecici-") && m.message_text === p.new.message_text);
             if (geciciVar) return prev.map(m => m.id === geciciVar.id ? p.new : m);
@@ -104,7 +103,7 @@ function Sohbet({ konusmaId, profil, onGeri }) {
           });
         })
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { ch.unsubscribe(); supabase.removeChannel(ch); };
   }, [konusmaId]);
 
   async function yukle() {
@@ -337,13 +336,13 @@ function Inbox({ profil, onSohbetAc }) {
       }
     }
     yukle();
-    const ch = supabase.channel("inbox-rt-" + filtre)
+    const ch = supabase.channel("inbox-conversations")
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
         yukle();
         sesCaldir();
       })
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { ch.unsubscribe(); supabase.removeChannel(ch); };
   }, [filtre]);
 
   const liste = konusmalar.filter(k => {
