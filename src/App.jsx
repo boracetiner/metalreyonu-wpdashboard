@@ -10,6 +10,29 @@ import {
   getHazirYanitlar, getTemsilciler, profilGuncelle, getKategoriler
 } from "./supabaseClient";
 
+// ── SES BİLDİRİMİ ────────────────────────────────────────────────────────
+function sesCaldir() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notalar = [
+      { frekans: 880,  baslangic: 0,    sure: 0.12 },
+      { frekans: 1320, baslangic: 0.13, sure: 0.18 }
+    ];
+    notalar.forEach(({ frekans, baslangic, sure }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = frekans;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0, ctx.currentTime + baslangic);
+      gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + baslangic + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + baslangic + sure);
+      osc.start(ctx.currentTime + baslangic);
+      osc.stop(ctx.currentTime + baslangic + sure);
+    });
+  } catch(e) {}
+}
+
 const SONUCLAR = [
   { key: "satis",           label: "🛒 Satışa Dönüştü",         kapat: true  },
   { key: "soru_cevaplandi", label: "💬 Soru Cevaplandı",         kapat: true  },
@@ -93,17 +116,30 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 
   useEffect(() => {
     yukle();
-    const ch = supabase.channel("sohbet-msgs", { config: { broadcast: { self: true } } })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "conversation_id=eq." + konusmaId },
-        p => {
-          setMesajlar(prev => {
-            const geciciVar = prev.find(m => m.id?.startsWith("gecici-") && m.message_text === p.new.message_text);
-            if (geciciVar) return prev.map(m => m.id === geciciVar.id ? p.new : m);
-            return [...prev, p.new];
-          });
-        })
-      .subscribe();
-    return () => { ch.unsubscribe(); supabase.removeChannel(ch); };
+    // Realtime yerine polling - 3 saniyede bir kontrol
+    let lastMsgId = null;
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", konusmaId)
+        .order("sent_at", { ascending: false })
+        .limit(1);
+      if (data?.[0] && data[0].id !== lastMsgId) {
+        lastMsgId = data[0].id;
+        setMesajlar(prev => {
+          // Zaten varsa ekleme
+          if (prev.find(m => m.id === data[0].id)) return prev;
+          // Geçici mesajı değiştir
+          const geciciVar = prev.find(m => m.id?.startsWith("gecici-") && m.message_text === data[0].message_text);
+          if (geciciVar) return prev.map(m => m.id === geciciVar.id ? data[0] : m);
+          // Yeni inbound mesajsa ses çal
+          if (data[0].direction === "inbound") sesCaldir();
+          return [...prev, data[0]];
+        });
+      }
+    }, 3000);
+    return () => clearInterval(interval);
   }, [konusmaId]);
 
   async function yukle() {
@@ -311,21 +347,6 @@ function Inbox({ profil, onSohbetAc }) {
   const [arama, setArama]           = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
-  function sesCaldir() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
-    } catch(e) {}
-  }
-
   useEffect(() => {
     async function yukle() {
       const data = await getKonusmalar({ status: filtre === "all" || filtre === "active" ? undefined : filtre });
@@ -336,13 +357,11 @@ function Inbox({ profil, onSohbetAc }) {
       }
     }
     yukle();
-    const ch = supabase.channel("inbox-conversations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
-        yukle();
-        sesCaldir();
-      })
-      .subscribe();
-    return () => { ch.unsubscribe(); supabase.removeChannel(ch); };
+    // Realtime yerine polling - 5 saniyede bir
+    const interval = setInterval(() => {
+      yukle();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [filtre]);
 
   const liste = konusmalar.filter(k => {
