@@ -9,6 +9,14 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
     storageKey: 'metalreyonu-auth'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 0
+    }
+  },
+  global: {
+    fetch: (...args) => fetch(...args)
   }
 })
 
