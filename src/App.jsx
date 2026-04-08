@@ -116,28 +116,19 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 
   useEffect(() => {
     yukle();
-    // Realtime yerine polling - 3 saniyede bir kontrol
-    let lastMsgId = null;
+    // Polling - 3 saniyede tüm mesajları çek
     const interval = setInterval(async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", konusmaId)
-        .order("sent_at", { ascending: false })
-        .limit(1);
-      if (data?.[0] && data[0].id !== lastMsgId) {
-        lastMsgId = data[0].id;
-        setMesajlar(prev => {
-          // Zaten varsa ekleme
-          if (prev.find(m => m.id === data[0].id)) return prev;
-          // Geçici mesajı değiştir
-          const geciciVar = prev.find(m => m.id?.startsWith("gecici-") && m.message_text === data[0].message_text);
-          if (geciciVar) return prev.map(m => m.id === geciciVar.id ? data[0] : m);
-          // Yeni inbound mesajsa ses çal
-          if (data[0].direction === "inbound") sesCaldir();
-          return [...prev, data[0]];
-        });
-      }
+      const yeniMesajlar = await getMesajlar(konusmaId);
+      setMesajlar(prev => {
+        if (yeniMesajlar.length === prev.filter(m => !m.id?.startsWith("gecici-")).length) return prev;
+        // Yeni inbound mesaj varsa ses çal
+        const eskiIdler = new Set(prev.map(m => m.id));
+        const yeniInbound = yeniMesajlar.filter(m => !eskiIdler.has(m.id) && m.direction === "inbound");
+        if (yeniInbound.length > 0) sesCaldir();
+        // Geçici mesajları koru, gerçeklerle güncelle
+        const geciciler = prev.filter(m => m.id?.startsWith("gecici-"));
+        return [...yeniMesajlar, ...geciciler.filter(g => !yeniMesajlar.find(m => m.message_text === g.message_text))];
+      });
     }, 3000);
     return () => clearInterval(interval);
   }, [konusmaId]);
