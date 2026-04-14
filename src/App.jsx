@@ -365,10 +365,18 @@ function Inbox({ profil, onSohbetAc }) {
         setKonusmalar(data || []);
       }
     }
+    let oncekiSayı = 0;
     yukle();
     // Realtime yerine polling - 5 saniyede bir
-    const interval = setInterval(() => {
-      yukle();
+    const interval = setInterval(async () => {
+      const onceki = oncekiSayı;
+      await yukle();
+      // Yeni konuşma/mesaj gelince ses çal
+      setKonusmalar(prev => {
+        if (prev.length > onceki && onceki > 0) sesCaldir();
+        oncekiSayı = prev.length;
+        return prev;
+      });
     }, 5000);
     return () => clearInterval(interval);
   }, [filtre]);
