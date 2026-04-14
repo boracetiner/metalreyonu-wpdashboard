@@ -356,7 +356,6 @@ function Inbox({ profil, onSohbetAc }) {
   const [arama, setArama]           = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
   const [yeniMesajSayilari, setYeniMesajSayilari] = useState({});
-  const sonGoruntulemeSaati = useState({ current: Date.now() })[0];
 
   useEffect(() => {
     async function yukle() {
@@ -368,19 +367,34 @@ function Inbox({ profil, onSohbetAc }) {
       }
     }
     let oncekiSayı = 0;
-    sonGoruntulemeSaati.current = Date.now();
-    setYeniMesajSayilari({});
-
     async function yeniMesajlariSay() {
       try {
-        const sinceISO = new Date(sonGoruntulemeSaati.current).toISOString();
-        const yeniMesajlar = await getMesajlar({ _raw: `?direction=eq.inbound&sent_at=gt.${sinceISO}&select=conversation_id` });
+        const since24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        // Son 24 saatteki inbound mesajlar
+        const [yeniMesajlar, goruntulemeler] = await Promise.all([
+          getMesajlar({ _raw: `?direction=eq.inbound&sent_at=gt.${since24}&select=conversation_id,sent_at` }),
+          fetch(`https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views?select=conversation_id,viewed_at&user_id=eq.${profil?.id}`, {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5d29oYWtpeGFvZGl5eGlsZ3NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ0ODEsImV4cCI6MjA4ODI5MDQ4MX0.MMcMO_2WPosy7sukDH9wmaWCEOQJEq56NeuRBg5uAF8',
+              'Authorization': 'Bearer ' + (JSON.parse(localStorage.getItem('metalreyonu-auth')||'{}')?.access_token || '')
+            }
+          }).then(r => r.json()).catch(() => [])
+        ]);
+        // conversation_views tablosundan görüntüleme zamanlarını al  
+        const viewMap = {};
+        (goruntulemeler || []).forEach(v => { viewMap[v.conversation_id] = new Date(v.viewed_at).getTime(); });
+        
         if (yeniMesajlar?.length > 0) {
           const sayac = {};
-          yeniMesajlar.forEach(m => { sayac[m.conversation_id] = (sayac[m.conversation_id] || 0) + 1; });
+          yeniMesajlar.forEach(m => {
+            const sonGoruntuleme = viewMap[m.conversation_id] || 0;
+            if (new Date(m.sent_at).getTime() > sonGoruntuleme) {
+              sayac[m.conversation_id] = (sayac[m.conversation_id] || 0) + 1;
+            }
+          });
           setYeniMesajSayilari(sayac);
         }
-      } catch(e) {}
+      } catch(e) { console.error("yeniMesajlariSay hatası:", e); }
     }
 
     yukle();
@@ -434,6 +448,16 @@ function Inbox({ profil, onSohbetAc }) {
         </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {/* Kolon başlıkları */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", position: "sticky", top: 0, zIndex: 1 }}>
+          <div style={{ width: 32, flexShrink: 0 }} />
+          <div style={{ width: 130, flexShrink: 0, fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Müşteri</div>
+          <div style={{ width: 32, flexShrink: 0, fontSize: 10, fontWeight: 600, color: "#9ca3af", textAlign: "center" }}>Yeni</div>
+          <div style={{ flex: 1, fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Son Mesaj</div>
+          <div style={{ width: 36, fontSize: 10, fontWeight: 600, color: "#9ca3af", textAlign: "right" }}>Süre</div>
+          <div style={{ width: 60, flexShrink: 0, fontSize: 10, fontWeight: 600, color: "#9ca3af", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.05em" }}>Statü</div>
+          <div style={{ width: 80, flexShrink: 0, fontSize: 10, fontWeight: 600, color: "#9ca3af", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.05em" }}>Temsilci</div>
+        </div>
         {yukleniyor
           ? <div style={{ textAlign: "center", padding: 40, color: "#e5e7eb", fontSize: 13 }}>―</div>
           : liste.length === 0
@@ -452,7 +476,25 @@ function Inbox({ profil, onSohbetAc }) {
                 const sonMesajTarih = k.last_message_at ? new Date(k.last_message_at) : null;
                 const sonMesajStr = sonMesajTarih ? sonMesajTarih.toLocaleDateString("tr-TR", {day:"2-digit",month:"2-digit"}) + " " + sonMesajTarih.toLocaleTimeString("tr-TR", {hour:"2-digit",minute:"2-digit"}) : "—";
                 return (
-                  <div key={k.id} onClick={() => { onSohbetAc(k.id); setYeniMesajSayilari(prev => ({...prev, [k.id]: 0})); }}
+                  <div key={k.id} onClick={() => { 
+                    onSohbetAc(k.id);
+                    setYeniMesajSayilari(prev => ({...prev, [k.id]: 0}));
+                    // Görüntüleme zamanını Supabase'e kaydet
+                    if (profil?.id) {
+                      getKonusmalar({ _raw: `/conversation_views?user_id=eq.${profil.id}&conversation_id=eq.${k.id}` })
+                        .catch(() => {});
+                      fetch('https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views', {
+                        method: 'POST',
+                        headers: {
+                          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5d29oYWtpeGFvZGl5eGlsZ3NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ0ODEsImV4cCI6MjA4ODI5MDQ4MX0.MMcMO_2WPosy7sukDH9wmaWCEOQJEq56NeuRBg5uAF8',
+                          'Authorization': 'Bearer ' + (JSON.parse(localStorage.getItem('metalreyonu-auth')||'{}')?.access_token || ''),
+                          'Content-Type': 'application/json',
+                          'Prefer': 'resolution=merge-duplicates'
+                        },
+                        body: JSON.stringify({ user_id: profil.id, conversation_id: k.id, viewed_at: new Date().toISOString() })
+                      }).catch(() => {});
+                    }
+                  }}
                     style={{ padding: "10px 16px", borderBottom: "1px solid #f3f4f6", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
                     onMouseLeave={e => e.currentTarget.style.background = benim ? "#f0fdf4" : "#fff"}>
