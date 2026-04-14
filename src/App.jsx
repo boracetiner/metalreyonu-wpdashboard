@@ -144,12 +144,19 @@ function Sohbet({ konusmaId, profil, onGeri }) {
   }, [mesajlar]);
 
   async function yukle() {
-    const [{ data: k }, m, hy] = await Promise.all([
-      supabase.from("conversations").select("*").eq("id", konusmaId).single(),
-      getMesajlar(konusmaId),
-      getHazirYanitlar()
-    ]);
-    setKonusma(k); setMesajlar(m); setHazirYanitlar(hy);
+    try {
+      const [konusmalar, m, hy] = await Promise.all([
+        getKonusmalar({ id: konusmaId }),
+        getMesajlar(konusmaId),
+        getHazirYanitlar()
+      ]);
+      const k = Array.isArray(konusmalar) ? konusmalar[0] : konusmalar;
+      if (k) setKonusma(k);
+      if (m) setMesajlar(m);
+      if (hy) setHazirYanitlar(hy);
+    } catch(e) {
+      console.error("Sohbet yukle hatasi:", e);
+    }
   }
 
   function metinDegistir(val) {
@@ -1240,24 +1247,20 @@ function Raporlama({ profil }) {
   }, [baslangic, bitis]);
 
   async function ara() {
-    // veri yüklenirken spinner gösterme;
-    let query = supabase.from("conversations").select("*, assigned_profile:profiles!conversations_assigned_agent_fkey(ad, soyad)")
-      .gte("created_at", baslangic + "T00:00:00")
-      .lte("created_at", bitis + "T23:59:59")
-      .order("created_at", { ascending: false });
-
-    if (statü !== "all") query = query.eq("status", statü);
-    // Temsilci rolü sadece kendi verilerini görebilir
-    if (profil?.rol === "temsilci") {
-      query = query.eq("assigned_agent", profil.id);
-    } else if (temsilci === "unassigned") {
-      query = query.is("assigned_agent", null);
-    } else if (temsilci !== "all") {
-      query = query.eq("assigned_agent", temsilci);
-    }
-
-    const { data } = await query;
-    setKonusmalar(data || []);
+    setYukleniyor(true);
+    try {
+      let params = `?select=*,assigned_profile:profiles!conversations_assigned_agent_fkey(ad,soyad)&created_at=gte.${baslangic}T00:00:00&created_at=lte.${bitis}T23:59:59&order=created_at.desc`;
+      if (statü !== "all") params += `&status=eq.${statü}`;
+      if (profil?.rol === "temsilci") {
+        params += `&assigned_agent=eq.${profil.id}`;
+      } else if (temsilci === "unassigned") {
+        params += `&assigned_agent=is.null`;
+      } else if (temsilci !== "all") {
+        params += `&assigned_agent=eq.${temsilci}`;
+      }
+      const data = await getKonusmalar({ _raw: params });
+      setKonusmalar(data || []);
+    } catch(e) { console.error("Rapor hatası:", e); }
     setYukleniyor(false);
   }
 

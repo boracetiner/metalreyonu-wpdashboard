@@ -82,7 +82,9 @@ export async function cikisYap() {
 
 // ── Konuşmalar ────────────────────────────────────────────────────────────
 export async function getKonusmalar(filtre = {}) {
+  if (filtre._raw) return restGet('conversations', filtre._raw)
   let params = '?select=*,assigned_profile:profiles!conversations_assigned_agent_fkey(id,ad,soyad)&order=last_message_at.desc'
+  if (filtre.id) params += `&id=eq.${filtre.id}`
   if (filtre.status) params += `&status=eq.${filtre.status}`
   if (filtre.assigned_agent) params += `&assigned_agent=eq.${filtre.assigned_agent}`
   if (filtre.limit) params += `&limit=${filtre.limit}`
