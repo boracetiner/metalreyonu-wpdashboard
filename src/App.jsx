@@ -355,6 +355,8 @@ function Inbox({ profil, onSohbetAc }) {
   const [filtre, setFiltre]         = useState("active");
   const [arama, setArama]           = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
+  const [yeniMesajSayilari, setYeniMesajSayilari] = useState({});
+  const sonGoruntulemeSaati = useState({ current: Date.now() })[0];
 
   useEffect(() => {
     async function yukle() {
@@ -366,12 +368,28 @@ function Inbox({ profil, onSohbetAc }) {
       }
     }
     let oncekiSayı = 0;
+    sonGoruntulemeSaati.current = Date.now();
+    setYeniMesajSayilari({});
+
+    async function yeniMesajlariSay() {
+      try {
+        const sinceISO = new Date(sonGoruntulemeSaati.current).toISOString();
+        const yeniMesajlar = await getMesajlar({ _raw: `?direction=eq.inbound&sent_at=gt.${sinceISO}&select=conversation_id` });
+        if (yeniMesajlar?.length > 0) {
+          const sayac = {};
+          yeniMesajlar.forEach(m => { sayac[m.conversation_id] = (sayac[m.conversation_id] || 0) + 1; });
+          setYeniMesajSayilari(sayac);
+        }
+      } catch(e) {}
+    }
+
     yukle();
+    yeniMesajlariSay();
     // Realtime yerine polling - 5 saniyede bir
     const interval = setInterval(async () => {
       const onceki = oncekiSayı;
       await yukle();
-      // Yeni konuşma/mesaj gelince ses çal
+      await yeniMesajlariSay();
       setKonusmalar(prev => {
         if (prev.length > onceki && onceki > 0) sesCaldir();
         oncekiSayı = prev.length;
@@ -427,43 +445,51 @@ function Inbox({ profil, onSohbetAc }) {
                 return aK === bK ? 0 : aK ? -1 : 1;
               }).map(k => {
                 const isim = k.contact_name || k.contact_phone || "Bilinmiyor";
+                const isimKisa = isim.length > 18 ? isim.slice(0, 16) + "…" : isim;
                 const d = DURUM[k.status] || { label: k.status, renk: "#6b7280" };
                 const benim = k.assigned_agent === profil?.id;
+                const yeniSayi = yeniMesajSayilari[k.id] || 0;
+                const sonMesajTarih = k.last_message_at ? new Date(k.last_message_at) : null;
+                const sonMesajStr = sonMesajTarih ? sonMesajTarih.toLocaleDateString("tr-TR", {day:"2-digit",month:"2-digit"}) + " " + sonMesajTarih.toLocaleTimeString("tr-TR", {hour:"2-digit",minute:"2-digit"}) : "—";
                 return (
-                  <div key={k.id} onClick={() => onSohbetAc(k.id)}
-                    style={{ padding: "14px 20px", borderBottom: "1px solid #f9fafb", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}
+                  <div key={k.id} onClick={() => { onSohbetAc(k.id); setYeniMesajSayilari(prev => ({...prev, [k.id]: 0})); }}
+                    style={{ padding: "10px 16px", borderBottom: "1px solid #f3f4f6", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
                     onMouseLeave={e => e.currentTarget.style.background = benim ? "#f0fdf4" : "#fff"}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {/* Avatar + isim */}
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
                         {isim.charAt(0).toUpperCase()}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{isim}</span>
-                          <span style={{ fontSize: 11, color: "#9ca3af" }} title={k.last_message_at ? new Date(k.last_message_at).toLocaleString("tr-TR") : ""}>
-                            {sure(k.last_message_at)}
+                      <div style={{ width: 130, flexShrink: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={isim}>{isimKisa}</div>
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{k.contact_phone}</div>
+                      </div>
+                      {/* Yeni mesaj sayısı */}
+                      <div style={{ width: 32, flexShrink: 0, textAlign: "center" }}>
+                        {yeniSayi > 0 && <span style={{ background: "#16a34a", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px" }}>{yeniSayi}</span>}
+                      </div>
+                      {/* Son mesaj tarihi */}
+                      <div style={{ flex: 1, fontSize: 11, color: "#6b7280", whiteSpace: "nowrap" }}>{sonMesajStr}</div>
+                      {/* Geçen süre */}
+                      <div style={{ width: 36, fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", textAlign: "right" }}>{sure(k.last_message_at)}</div>
+                      {/* Statü */}
+                      <div style={{ width: 60, flexShrink: 0, textAlign: "right" }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "2px 6px", borderRadius: 4 }}>{d.label}</span>
+                      </div>
+                      {/* Atanan */}
+                      <div style={{ width: 80, flexShrink: 0, textAlign: "right" }}>
+                        {k.assigned_profile ? (
+                          <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>
+                            {k.assigned_profile.ad}
                           </span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 11, color: "#9ca3af", flex: 1, minWidth: 60 }}>{k.category?.replace(/_/g, " ") || "—"}</span>
-                          {k.assigned_profile ? (
-                            <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
-                              👤 {k.assigned_profile.ad} {k.assigned_profile.soyad}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 10, color: "#f59e0b", background: "#fffbeb", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>
-                              ⏳ Atanmamış
-                            </span>
-                          )}
-                          <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "1px 7px", borderRadius: 4, whiteSpace: "nowrap" }}>{d.label}</span>
-                        </div>
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#f59e0b", background: "#fffbeb", padding: "1px 6px", borderRadius: 4 }}>Atanmamış</span>
+                        )}
                       </div>
                     </div>
                     {k.onceki_sonuc && (
-                      <div style={{ marginTop: 6, marginLeft: 52, fontSize: 11, color: "#f59e0b", background: "#fffbeb", padding: "3px 8px", borderRadius: 4, border: "1px solid #fed7aa" }}>
-                        ⚠️ Önceki: {k.onceki_sonuc}
-                      </div>
+                      <div style={{ marginTop: 4, marginLeft: 40, fontSize: 11, color: "#f59e0b" }}>⚠️ Önceki: {k.onceki_sonuc}</div>
                     )}
                   </div>
                 );
