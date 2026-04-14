@@ -803,24 +803,24 @@ function PerformansRaporu({ profil }) {
   useEffect(() => { yukle(); }, [donem]);
 
   async function yukle() {
-    // veri yüklenirken spinner gösterme;
     const gun = donem === "bugun" ? 1 : donem === "hafta" ? 7 : 30;
     const since = new Date(); since.setDate(since.getDate() - gun);
-
-    const [{ data: profiles }, { data: konusmalar }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("rol", "temsilci"),
-      supabase.from("conversations").select("*").gte("created_at", since.toISOString())
-    ]);
-
-    const liste = (profiles || []).map(p => {
-      const atanan   = konusmalar?.filter(k => k.assigned_agent === p.id) || [];
-      const kapanan  = atanan.filter(k => k.status === "kapali" || k.status === "closed");
-      const satis    = atanan.filter(k => k.sonuc === "satis");
-      const oran     = atanan.length ? Math.round((kapanan.length / atanan.length) * 100) : 0;
-      return { ...p, atanan: atanan.length, kapanan: kapanan.length, satis: satis.length, oran };
-    }).sort((a, b) => b.oran - a.oran);
-
-    setTemsilciler(liste); setYukleniyor(false);
+    const sinceISO = since.toISOString();
+    try {
+      const [profiles, konusmalar] = await Promise.all([
+        getTemsilciler(),
+        getKonusmalar({ _raw: `?select=assigned_agent,status,sonuc&created_at=gte.${sinceISO}` })
+      ]);
+      const liste = (profiles || []).map(p => {
+        const atanan  = (konusmalar || []).filter(k => k.assigned_agent === p.id);
+        const kapanan = atanan.filter(k => k.status === "kapali" || k.status === "closed");
+        const satis   = atanan.filter(k => k.sonuc === "satis");
+        const oran    = atanan.length ? Math.round((kapanan.length / atanan.length) * 100) : 0;
+        return { ...p, atanan: atanan.length, kapanan: kapanan.length, satis: satis.length, oran };
+      }).sort((a, b) => b.oran - a.oran);
+      setTemsilciler(liste);
+    } catch(e) { console.error("Performans hatası:", e); }
+    setYukleniyor(false);
   }
 
   return (
@@ -1373,7 +1373,7 @@ function Raporlama({ profil }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                {["Müşteri", "Telefon", "Kategori", "Statü", "Sonuç", "Sipariş No", "Fatura No", "Temsilci", "Tarih"].map(h => (
+                {["Müşteri", "Telefon", "Kategori", "Statü", "Sonuç", "Sipariş No", "Fatura No", "Temsilci", "Mesaj", "İlk Yazışma", "Son Yazışma"].map(h => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -1389,7 +1389,12 @@ function Raporlama({ profil }) {
                   <tr key={k.id} style={{ borderBottom: "1px solid #f3f4f6" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
                     onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
-                    <td style={{ padding: "10px 14px", fontWeight: 600, color: "#111827" }}>{k.contact_name || "—"}</td>
+                    <td style={{ padding: "10px 14px", fontWeight: 600, color: "#111827" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {k.contact_name || "—"}
+                        {k.is_new_customer && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#16a34a", padding: "1px 6px", borderRadius: 4 }}>NEW</span>}
+                      </div>
+                    </td>
                     <td style={{ padding: "10px 14px", color: "#6b7280" }}>{k.contact_phone || "—"}</td>
                     <td style={{ padding: "10px 14px", color: "#6b7280" }}>{k.category?.replace(/_/g, " ") || "—"}</td>
                     <td style={{ padding: "10px 14px" }}>
@@ -1399,7 +1404,15 @@ function Raporlama({ profil }) {
                     <td style={{ padding: "10px 14px", color: "#6b7280", fontFamily: "monospace", fontSize: 12 }}>{k.siparis_no || "—"}</td>
                     <td style={{ padding: "10px 14px", color: "#6b7280", fontFamily: "monospace", fontSize: 12 }}>{k.fatura_no || "—"}</td>
                     <td style={{ padding: "10px 14px", color: "#6b7280" }}>{k.assigned_profile ? k.assigned_profile.ad + " " + k.assigned_profile.soyad : "Atanmamış"}</td>
-                    <td style={{ padding: "10px 14px", color: "#9ca3af", fontSize: 12, whiteSpace: "nowrap" }}>{k.created_at ? new Date(k.created_at).toLocaleDateString("tr-TR") : "—"}</td>
+                    <td style={{ padding: "10px 14px", color: "#374151", fontSize: 12, textAlign: "center" }}>{k.message_count || "—"}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 11, whiteSpace: "nowrap" }}>
+                      <div style={{ color: "#374151" }}>{k.first_message_at ? new Date(k.first_message_at).toLocaleDateString("tr-TR") : "—"}</div>
+                      <div style={{ color: "#9ca3af" }}>{k.first_message_at ? new Date(k.first_message_at).toLocaleTimeString("tr-TR", {hour:"2-digit",minute:"2-digit"}) : ""}</div>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontSize: 11, whiteSpace: "nowrap" }}>
+                      <div style={{ color: "#374151" }}>{k.last_message_at ? new Date(k.last_message_at).toLocaleDateString("tr-TR") : "—"}</div>
+                      <div style={{ color: "#9ca3af" }}>{k.last_message_at ? new Date(k.last_message_at).toLocaleTimeString("tr-TR", {hour:"2-digit",minute:"2-digit"}) : ""}</div>
+                    </td>
                   </tr>
                 );
               })}
