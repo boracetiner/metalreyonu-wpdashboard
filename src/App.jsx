@@ -809,14 +809,17 @@ function PerformansRaporu({ profil }) {
     try {
       const [profiles, konusmalar] = await Promise.all([
         getTemsilciler(),
-        getKonusmalar({ _raw: `?select=assigned_agent,status,sonuc&created_at=gte.${sinceISO}` })
+        getKonusmalar({ _raw: `?select=assigned_agent,status,sonuc,message_count,response_time_minutes&created_at=gte.${sinceISO}` })
       ]);
       const liste = (profiles || []).map(p => {
         const atanan  = (konusmalar || []).filter(k => k.assigned_agent === p.id);
         const kapanan = atanan.filter(k => k.status === "kapali" || k.status === "closed");
         const satis   = atanan.filter(k => k.sonuc === "satis");
         const oran    = atanan.length ? Math.round((kapanan.length / atanan.length) * 100) : 0;
-        return { ...p, atanan: atanan.length, kapanan: kapanan.length, satis: satis.length, oran };
+        const toplamMesaj = atanan.reduce((acc, k) => acc + (k.message_count || 0), 0);
+        const donusSureleri = atanan.filter(k => k.response_time_minutes).map(k => k.response_time_minutes);
+        const ortDonusSure = donusSureleri.length ? Math.round(donusSureleri.reduce((a,b) => a+b, 0) / donusSureleri.length) : null;
+        return { ...p, atanan: atanan.length, kapanan: kapanan.length, satis: satis.length, oran, toplamMesaj, ortDonusSure };
       }).sort((a, b) => b.oran - a.oran);
       setTemsilciler(liste);
     } catch(e) { console.error("Performans hatası:", e); }
@@ -856,15 +859,18 @@ function PerformansRaporu({ profil }) {
                       <div style={{ fontSize: 11, color: "#9ca3af" }}>{t.atanan} konuşma</div>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 24 }}>
+                  <div style={{ display: "flex", gap: 20 }}>
                     {[
+                      { label: "Müşteri", val: t.atanan, renk: "#6b7280" },
+                      { label: "Mesaj",   val: t.toplamMesaj, renk: "#0891b2" },
                       { label: "Kapanan", val: t.kapanan, renk: "#16a34a" },
                       { label: "Satış",   val: t.satis,   renk: "#f59e0b" },
+                      { label: "Ort. Dönüş", val: t.ortDonusSure ? t.ortDonusSure + " dk" : "—", renk: t.ortDonusSure > 30 ? "#ef4444" : t.ortDonusSure > 15 ? "#f59e0b" : "#16a34a" },
                       { label: "Oran",    val: "%" + t.oran, renk: t.oran > 80 ? "#16a34a" : t.oran > 60 ? "#f59e0b" : "#ef4444" },
                     ].map((m, j) => (
                       <div key={j} style={{ textAlign: "center" }}>
                         <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 2 }}>{m.label}</div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: m.renk }}>{m.val}</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: m.renk }}>{m.val}</div>
                       </div>
                     ))}
                   </div>
