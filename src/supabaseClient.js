@@ -97,6 +97,9 @@ export async function konusmaGuncelle(id, updates) {
 
 // ── Mesajlar ──────────────────────────────────────────────────────────────
 export async function getMesajlar(conversationId) {
+  if (typeof conversationId === 'object' && conversationId._raw) {
+    return restGet('messages', conversationId._raw)
+  }
   return restGet('messages', `?conversation_id=eq.${conversationId}&order=sent_at.asc`)
 }
 

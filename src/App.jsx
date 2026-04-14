@@ -1489,17 +1489,20 @@ export default function App() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // Global ses + okunmamış badge için polling
+  // Global ses + okunmamış badge için polling - sadece inbound mesajları say
   useEffect(() => {
     if (!kullanici) return;
     const interval = setInterval(async () => {
       try {
-        const data = await getKonusmalar({ _raw: `?select=last_message_at,status&status=eq.open&order=last_message_at.desc&limit=1` });
-        if (data?.[0]?.last_message_at) {
-          const sonMesaj = new Date(data[0].last_message_at).getTime();
-          if (sonMesaj > sonMesajZaman.current && aktifSayfa !== "inbox" && !aktifKonusma) {
+        // Son inbound mesajı getir
+        const sinceISO = new Date(sonMesajZaman.current).toISOString();
+        const yeniMesajlar = await getMesajlar({ _raw: `?direction=eq.inbound&sent_at=gt.${sinceISO}&order=sent_at.desc` });
+        if (yeniMesajlar?.length > 0) {
+          // En son mesajın zamanını güncelle
+          sonMesajZaman.current = new Date(yeniMesajlar[0].sent_at).getTime();
+          if (aktifSayfa !== "inbox" || aktifKonusma) {
             sesCaldir();
-            setOkunmamis(prev => prev + 1);
+            setOkunmamis(prev => prev + yeniMesajlar.length);
           }
         }
       } catch(e) {}
