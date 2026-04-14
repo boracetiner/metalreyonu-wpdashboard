@@ -1457,6 +1457,8 @@ export default function App() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [aktifSayfa, setAktifSayfa] = useState("dashboard");
   const [aktifKonusma, setAktifKonusma] = useState(null);
+  const [okunmamis, setOkunmamis]   = useState(0);
+  const sonMesajZaman = useState({ current: Date.now() })[0];
 
   useEffect(() => {
     let mounted = true;
@@ -1486,6 +1488,24 @@ export default function App() {
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
+
+  // Global ses + okunmamış badge için polling
+  useEffect(() => {
+    if (!kullanici) return;
+    const interval = setInterval(async () => {
+      try {
+        const data = await getKonusmalar({ _raw: `?select=last_message_at,status&status=eq.open&order=last_message_at.desc&limit=1` });
+        if (data?.[0]?.last_message_at) {
+          const sonMesaj = new Date(data[0].last_message_at).getTime();
+          if (sonMesaj > sonMesajZaman.current && aktifSayfa !== "inbox" && !aktifKonusma) {
+            sesCaldir();
+            setOkunmamis(prev => prev + 1);
+          }
+        }
+      } catch(e) {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [kullanici, aktifSayfa, aktifKonusma]);
 
   async function profilYukle(userId) {
     try {
@@ -1525,11 +1545,14 @@ export default function App() {
           </div>
           <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
             {MENU.filter(m => m.roller.includes(profil?.rol || "temsilci")).map(item => (
-              <button key={item.key} onClick={() => { setAktifSayfa(item.key); setAktifKonusma(null); }}
+              <button key={item.key} onClick={() => { setAktifSayfa(item.key); setAktifKonusma(null); if (item.key === "inbox") { setOkunmamis(0); sonMesajZaman.current = Date.now(); } }}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aktifSayfa === item.key ? 600 : 500, textAlign: "left", width: "100%",
                   background: aktifSayfa === item.key ? "#dcfce7" : "transparent",
                   color: aktifSayfa === item.key ? "#16a34a" : "#6b7280" }}>
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.key === "inbox" && okunmamis > 0 && (
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 18, textAlign: "center" }}>{okunmamis}</span>
+                )}
               </button>
             ))}
           </nav>
