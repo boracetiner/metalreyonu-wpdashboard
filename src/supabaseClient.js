@@ -15,7 +15,20 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   db: { schema: 'public' }
 })
 
-// Token'ı her zaman localStorage'dan al
+// Token'ı her zaman localStorage'dan al, süresi dolduysa refresh et
+async function getTokenAsync() {
+  try {
+    const raw = localStorage.getItem('metalreyonu-auth')
+    if (!raw) return SUPABASE_ANON_KEY
+    const session = JSON.parse(raw)
+    if (session?.expires_at && session.expires_at < (Date.now() / 1000 + 30)) {
+      const { data } = await supabase.auth.refreshSession()
+      return data?.session?.access_token || SUPABASE_ANON_KEY
+    }
+    return session?.access_token || SUPABASE_ANON_KEY
+  } catch { return SUPABASE_ANON_KEY }
+}
+
 function getToken() {
   try {
     const raw = localStorage.getItem('metalreyonu-auth')
@@ -27,10 +40,11 @@ function getToken() {
 
 // Authenticated REST API çağrısı
 async function restGet(table, params = '') {
+  const token = await getTokenAsync()
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
     headers: {
       'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + getToken(),
+      'Authorization': 'Bearer ' + token,
       'Accept': 'application/json'
     }
   })
@@ -39,11 +53,12 @@ async function restGet(table, params = '') {
 }
 
 async function restPatch(table, id, body) {
+  const token = await getTokenAsync()
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
       'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + getToken(),
+      'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     },

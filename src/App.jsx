@@ -114,6 +114,9 @@ function Sohbet({ konusmaId, profil, onGeri }) {
   const [faturaNo, setFaturaNo]           = useState("");
   const [satisForm, setSatisForm]         = useState(false);
 
+  const altRef = useState(null)[0];
+  const altDivRef = { current: null };
+
   useEffect(() => {
     yukle();
     // Polling - 3 saniyede tüm mesajları çek
@@ -132,6 +135,13 @@ function Sohbet({ konusmaId, profil, onGeri }) {
     }, 3000);
     return () => clearInterval(interval);
   }, [konusmaId]);
+
+  // Yeni mesaj gelince en alta scroll
+  useEffect(() => {
+    if (altDivRef.current) {
+      altDivRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [mesajlar]);
 
   async function yukle() {
     const [{ data: k }, m, hy] = await Promise.all([
@@ -242,6 +252,7 @@ function Sohbet({ konusmaId, profil, onGeri }) {
             </div>
           );
         })}
+        <div ref={r => { altDivRef.current = r; }} />
       </div>
 
       <div style={{ background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px" }}>
@@ -1222,8 +1233,11 @@ function Raporlama({ profil }) {
 
   useEffect(() => {
     getTemsilciler().then(setTemsilciler);
-    ara();
   }, []);
+
+  useEffect(() => {
+    ara();
+  }, [baslangic, bitis]);
 
   async function ara() {
     // veri yüklenirken spinner gösterme;
