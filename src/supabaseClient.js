@@ -73,6 +73,10 @@ async function restPatch(table, id, body) {
 export async function girisYap(email, sifre) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password: sifre })
   if (error) throw error
+  // Son giriş zamanını kaydet
+  if (data?.user?.id) {
+    restPatch('profiles', data.user.id, { son_giris: new Date().toISOString() }).catch(() => {})
+  }
   return data
 }
 
@@ -142,10 +146,11 @@ export async function getKpiStats() {
   const bugunISO = bugun.toISOString()
   const haftaISO = new Date(bugun.getTime() - 7 * 86400000).toISOString()
 
-  const [tumKonusmalar, bugunKonusmalar, haftaKonusmalar] = await Promise.all([
+  const [tumKonusmalar, bugunKonusmalar, haftaKonusmalar, bugunMesajlar] = await Promise.all([
     restGet('conversations', '?select=status,sonuc'),
     restGet('conversations', `?select=id,status,sonuc&created_at=gte.${bugunISO}`),
-    restGet('conversations', `?select=id,status,sonuc&created_at=gte.${haftaISO}`)
+    restGet('conversations', `?select=id,status,sonuc&created_at=gte.${haftaISO}`),
+    restGet('messages', `?select=id&sent_at=gte.${bugunISO}&direction=eq.inbound`)
   ])
 
   const total = tumKonusmalar?.length || 0
@@ -156,6 +161,7 @@ export async function getKpiStats() {
 
   return {
     bugunGelen: bugunKonusmalar?.length || 0,
+    bugunMesaj: bugunMesajlar?.length || 0,
     haftaGelen: haftaKonusmalar?.length || 0,
     bekleyen, kapanan, satis, kapanmaOrani, total
   }

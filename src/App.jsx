@@ -569,7 +569,7 @@ function OzetBant({ profil }) {
   useEffect(() => {
     async function yukle() {
       const bugun = new Date(); bugun.setHours(0,0,0,0);
-      const [{ data: benim }, { data: bekleyen }, { data: bugunKonusmalar }] = await Promise.all([
+      const [benim, bekleyen, bugunKonusmalar] = await Promise.all([
         supabase.from("conversations").select("id", { count: "exact" }).eq("assigned_agent", profil?.id).eq("status", "open"),
         supabase.from("conversations").select("id", { count: "exact" }).is("assigned_agent", null).eq("status", "open"),
         supabase.from("conversations").select("id", { count: "exact" }).gte("created_at", bugun.toISOString())
@@ -627,8 +627,9 @@ function Dashboard({ profil }) {
         <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Genel Bakış</h1>
         <p style={{ fontSize: 13, color: "#6b7280" }}>Hoş geldin, {profil?.ad} · Son 15 gün</p>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16, marginBottom: 24 }}>
         <KpiKart baslik="Bugün Gelen"    deger={kpi.bugunGelen}       alt="yeni konuşma"   renk="#16a34a" icon="💬" />
+        <KpiKart baslik="Bugün Mesaj"    deger={kpi.bugunMesaj || 0}  alt="toplam mesaj"   renk="#8b5cf6" icon="✉️" />
         <KpiKart baslik="Bu Hafta"       deger={kpi.haftaGelen}       alt="toplam konuşma" renk="#0891b2" icon="📅" />
         <KpiKart baslik="Bekleyen"       deger={kpi.bekleyen}         alt="yanıt bekliyor" renk="#ef4444" icon="⏳" />
         <KpiKart baslik="Kapanma Oranı"  deger={"%" + kpi.kapanmaOrani} alt={kpi.satis + " satış"} renk="#f59e0b" icon="✅" />
@@ -804,17 +805,20 @@ function AtamaKuyrugu({ profil }) {
 
   async function yukle() {
     // veri yüklenirken spinner gösterme;
-    const { data } = await supabase.from("conversations").select("*").eq("status", "open").is("assigned_agent", null).order("created_at", { ascending: true });
+    const data = await getKonusmalar({ _raw: "?status=eq.open&assigned_agent=is.null&order=created_at.asc" });
     setKonusmalar(data || []); setYukleniyor(false);
   }
 
   async function atamaYap(konusmaId) {
     try {
-      const { error } = await supabase.from("conversations").update({ 
-        assigned_agent: profil.id,
-        status: "open"
-      }).eq("id", konusmaId);
-      if (error) { alert("Hata: " + error.message); return; }
+      // Önce hâlâ atanmamış mı kontrol et (race condition önleme)
+      const kontrol = await getKonusmalar({ _raw: `?id=eq.${konusmaId}&assigned_agent=is.null&select=id` });
+      if (!kontrol || kontrol.length === 0) {
+        alert("Bu sohbet az önce başka bir temsilci tarafından üstlenildi.");
+        yukle();
+        return;
+      }
+      await konusmaGuncelle(konusmaId, { assigned_agent: profil.id, status: "open", assigned_at: new Date().toISOString() });
       yukle();
     } catch(e) { alert("Hata: " + e.message); }
   }
@@ -1235,7 +1239,10 @@ function TemsilciYonetimi({ profil }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{t.ad} {t.soyad}</div>
-                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{ROL_ETIKET[t.rol] || t.rol}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>{ROL_ETIKET[t.rol] || t.rol}</div>
+                    <div style={{ fontSize: 11, color: "#d1d5db", marginTop: 1 }}>
+                      {t.son_giris ? "Son giriş: " + new Date(t.son_giris).toLocaleString("tr-TR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Henüz giriş yok"}
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1285,13 +1292,21 @@ function TemsilciYonetimi({ profil }) {
             {modal.tip === "rol" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                 {Object.entries(ROL_ETIKET).map(([key, label]) => (
-                  <button key={key} onClick={() => rolDegistir(modal.veri.id, key)}
-                    style={{ padding: "12px 16px", borderRadius: 8, border: "2px solid " + (modal.veri.rol === key ? "#16a34a" : "#e5e7eb"),
-                      background: modal.veri.rol === key ? "#dcfce7" : "#fff",
-                      color: "#111827", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                  <button key={key} onClick={() => setModal(prev => ({ ...prev, seciliRol: key }))}
+                    style={{ padding: "12px 16px", borderRadius: 8, border: "2px solid " + ((modal.seciliRol || modal.veri.rol) === key ? "#16a34a" : "#e5e7eb"),
+                      background: (modal.seciliRol || modal.veri.rol) === key ? "#dcfce7" : "#fff",
+                      color: "#111827", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left",
+                      display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     {label}
+                    {(modal.seciliRol || modal.veri.rol) === key && <span style={{ color: "#16a34a" }}>✓</span>}
                   </button>
                 ))}
+                {modal.seciliRol && modal.seciliRol !== modal.veri.rol && (
+                  <button onClick={() => rolDegistir(modal.veri.id, modal.seciliRol)}
+                    style={{ padding: "12px 16px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
+                    ✓ Rolü Kaydet → {ROL_ETIKET[modal.seciliRol]}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1557,6 +1572,26 @@ export default function App() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
+  // Token süresi kontrolü - her dakika kontrol et
+  useEffect(() => {
+    if (!kullanici) return;
+    const interval = setInterval(() => {
+      const raw = localStorage.getItem('metalreyonu-auth');
+      if (!raw) return;
+      const session = JSON.parse(raw);
+      if (session?.expires_at && session.expires_at < (Date.now() / 1000 + 60)) {
+        // 1 dakika kaldı - refresh dene
+        supabase.auth.refreshSession().catch(() => {
+          // Refresh başarısız - kullanıcıyı bildir
+          if (confirm("Oturumunuzun süresi doldu. Yeniden giriş yapmak ister misiniz?")) {
+            setKullanici(null); setProfil(null);
+          }
+        });
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [kullanici]);
+
   // Global ses + okunmamış badge için polling - sadece inbound mesajları say
   useEffect(() => {
     if (!kullanici) return;
@@ -1637,7 +1672,7 @@ export default function App() {
                 <div style={{ fontSize: 10, color: "#9ca3af" }}>{{ super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" }[profil?.rol]}</div>
               </div>
             </div>
-            <button onClick={() => cikisYap()}
+            <button onClick={async () => { await cikisYap(); setKullanici(null); setProfil(null); }}
               style={{ width: "100%", padding: 7, borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
               Çıkış Yap
             </button>
