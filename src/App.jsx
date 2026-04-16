@@ -72,7 +72,7 @@ function Login() {
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 400, padding: "0 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 14px" }}>💬</div>
+          <img src="/metalreyonu-wpdashboard/logo.jpg" alt="Metal Reyonu" style={{ height: 64, margin: "0 auto 14px", display: "block", objectFit: "contain" }} />
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 4 }}>Metal Reyonu</h1>
           <p style={{ fontSize: 13, color: "#6b7280" }}>WhatsApp Yönetim Paneli</p>
         </div>
@@ -1642,7 +1642,7 @@ export default function App() {
         <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #f3f4f6" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 8, background: "linear-gradient(135deg,#16a34a,#15803d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>💬</div>
+              <img src="/metalreyonu-wpdashboard/logo.jpg" alt="Metal Reyonu" style={{ height: 34, width: 34, objectFit: "contain", borderRadius: 6 }} />
               <div>
                 <div style={{ fontWeight: 800, fontSize: 13, color: "#111827" }}>Metal Reyonu</div>
                 <div style={{ fontSize: 10, color: "#9ca3af" }}>WhatsApp Yönetim</div>
