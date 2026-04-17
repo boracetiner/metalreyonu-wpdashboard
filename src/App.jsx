@@ -373,12 +373,12 @@ function Inbox({ profil, onSohbetAc }) {
         // Son 24 saatteki inbound mesajlar
         const [yeniMesajlar, goruntulemeler] = await Promise.all([
           getMesajlar({ _raw: `?direction=eq.inbound&sent_at=gt.${since24}&select=conversation_id,sent_at` }),
-          fetch(`https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views?select=conversation_id,viewed_at&user_id=eq.${profil?.id}`, {
+          profil?.id ? fetch(`https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views?select=conversation_id,viewed_at&user_id=eq.${profil.id}`, {
             headers: {
               'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5d29oYWtpeGFvZGl5eGlsZ3NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ0ODEsImV4cCI6MjA4ODI5MDQ4MX0.MMcMO_2WPosy7sukDH9wmaWCEOQJEq56NeuRBg5uAF8',
               'Authorization': 'Bearer ' + (JSON.parse(localStorage.getItem('metalreyonu-auth')||'{}')?.access_token || '')
             }
-          }).then(r => r.json()).catch(() => [])
+          }).then(r => Array.isArray(r) ? r : r.json()).catch(() => []) : Promise.resolve([])
         ]);
         // conversation_views tablosundan görüntüleme zamanlarını al  
         const viewMap = {};
@@ -398,7 +398,7 @@ function Inbox({ profil, onSohbetAc }) {
     }
 
     yukle();
-    yeniMesajlariSay();
+    if (profil?.id) yeniMesajlariSay();
     // Realtime yerine polling - 5 saniyede bir
     const interval = setInterval(async () => {
       const onceki = oncekiSayı;
@@ -1672,7 +1672,12 @@ export default function App() {
                 <div style={{ fontSize: 10, color: "#9ca3af" }}>{{ super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" }[profil?.rol]}</div>
               </div>
             </div>
-            <button onClick={async () => { await cikisYap(); setKullanici(null); setProfil(null); }}
+            <button onClick={async () => { 
+              await cikisYap(); 
+              localStorage.removeItem('metalreyonu-auth');
+              setKullanici(null); 
+              setProfil(null); 
+            }}
               style={{ width: "100%", padding: 7, borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
               Çıkış Yap
             </button>
