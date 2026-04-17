@@ -58,6 +58,9 @@ const GLOBAL_STYLE = `
 function Login() {
   const [email, setEmail]   = useState("");
   const [sifre, setSifre]   = useState("");
+  const [sifreGoster, setSifreGoster] = useState(false);
+  const [sifremiUnuttum, setSifremiUnuttum] = useState(false);
+  const [resetGonderildi, setResetGonderildi] = useState(false);
   const [hata, setHata]     = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
@@ -67,6 +70,63 @@ function Login() {
     try { await girisYap(email, sifre); }
     catch { setHata("E-posta veya şifre hatalı."); setYukleniyor(false); }
   }
+
+  async function handleReset(e) {
+    e.preventDefault();
+    setYukleniyor(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/metalreyonu-wpdashboard/"
+      });
+      if (error) throw error;
+      setResetGonderildi(true);
+    } catch(e) { setHata(e.message); }
+    setYukleniyor(false);
+  }
+
+  if (sifremiUnuttum) return (
+    <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: "0 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <img src="/metalreyonu-wpdashboard/logo.jpg" alt="Metal Reyonu" style={{ height: 64, margin: "0 auto 14px", display: "block", objectFit: "contain" }} />
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 4 }}>Şifre Sıfırlama</h1>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>E-posta adresinize sıfırlama bağlantısı göndereceğiz</p>
+        </div>
+        <div style={{ background: "#fff", borderRadius: 16, padding: 32, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          {resetGonderildi ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>📧</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 8 }}>E-posta gönderildi!</div>
+              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 24 }}>{email} adresine şifre sıfırlama bağlantısı gönderildi. Gelen kutunuzu kontrol edin.</div>
+              <button onClick={() => { setSifremiUnuttum(false); setResetGonderildi(false); }}
+                style={{ padding: "10px 24px", borderRadius: 8, background: "#16a34a", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Giriş sayfasına dön
+              </button>
+            </div>
+          ) : (
+            <>
+              {hata && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#dc2626", fontSize: 13 }}>{hata}</div>}
+              <form onSubmit={handleReset}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>E-posta</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="ornek@sirket.com"
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+                </div>
+                <button type="submit" disabled={yukleniyor}
+                  style={{ width: "100%", padding: 12, borderRadius: 8, background: "#16a34a", color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: yukleniyor ? 0.7 : 1 }}>
+                  {yukleniyor ? "Gönderiliyor..." : "Sıfırlama Bağlantısı Gönder"}
+                </button>
+              </form>
+              <button onClick={() => setSifremiUnuttum(false)}
+                style={{ width: "100%", marginTop: 12, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 13, cursor: "pointer" }}>
+                ← Giriş sayfasına dön
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -85,9 +145,18 @@ function Login() {
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
             </div>
             <div style={{ marginBottom: 22 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Şifre</label>
-              <input type="password" value={sifre} onChange={e => setSifre(e.target.value)} required
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Şifre</label>
+                <button type="button" onClick={() => setSifremiUnuttum(true)} style={{ fontSize: 11, color: "#16a34a", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Şifremi unuttum</button>
+              </div>
+              <div style={{ position: "relative" }}>
+                <input type={sifreGoster ? "text" : "password"} value={sifre} onChange={e => setSifre(e.target.value)} required
+                  style={{ width: "100%", padding: "10px 36px 10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, outline: "none" }} />
+                <button type="button" onClick={() => setSifreGoster(!sifreGoster)}
+                  style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}>
+                  {sifreGoster ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
             <button type="submit" disabled={yukleniyor}
               style={{ width: "100%", padding: 11, borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", opacity: yukleniyor ? 0.7 : 1 }}>
@@ -277,9 +346,11 @@ function Sohbet({ konusmaId, profil, onGeri }) {
           </div>
         )}
         {notModu && <div style={{ background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 6, padding: "6px 12px", marginBottom: 8, fontSize: 11, color: "#92400e", fontWeight: 600 }}>🔒 Not modu — müşteri görmez</div>}
-        {!konusma.assigned_agent ? (
+        {(!konusma.assigned_agent || (profil?.rol === "temsilci" && konusma.assigned_agent !== profil?.id)) ? (
           <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 8, fontSize: 13, color: "#92400e", textAlign: "center" }}>
-            ⚠️ Cevap yazabilmek için önce bu sohbeti üstlenin veya bir temsilci atanmalı
+            {!konusma.assigned_agent 
+              ? "⚠️ Cevap yazabilmek için önce bu sohbeti üstlenin veya bir temsilci atanmalı"
+              : "⚠️ Bu sohbet size atanmamış. Sadece atanan temsilci cevap yazabilir."}
           </div>
         ) : (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -481,8 +552,7 @@ function Inbox({ profil, onSohbetAc }) {
                     setYeniMesajSayilari(prev => ({...prev, [k.id]: 0}));
                     // Görüntüleme zamanını Supabase'e kaydet
                     if (profil?.id) {
-                      getKonusmalar({ _raw: `/conversation_views?user_id=eq.${profil.id}&conversation_id=eq.${k.id}` })
-                        .catch(() => {});
+                      // görüntüleme kaydı
                       fetch('https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views', {
                         method: 'POST',
                         headers: {
@@ -1674,9 +1744,8 @@ export default function App() {
             </div>
             <button onClick={async () => { 
               await cikisYap(); 
-              localStorage.removeItem('metalreyonu-auth');
-              setKullanici(null); 
-              setProfil(null); 
+              localStorage.clear();
+              window.location.reload();
             }}
               style={{ width: "100%", padding: 7, borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
               Çıkış Yap
