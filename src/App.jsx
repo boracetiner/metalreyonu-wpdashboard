@@ -378,7 +378,7 @@ function Inbox({ profil, onSohbetAc }) {
               'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5d29oYWtpeGFvZGl5eGlsZ3NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ0ODEsImV4cCI6MjA4ODI5MDQ4MX0.MMcMO_2WPosy7sukDH9wmaWCEOQJEq56NeuRBg5uAF8',
               'Authorization': 'Bearer ' + (JSON.parse(localStorage.getItem('metalreyonu-auth')||'{}')?.access_token || '')
             }
-          }).then(r => Array.isArray(r) ? r : r.json()).catch(() => []) : Promise.resolve([])
+          }).then(r => r.json()).catch(() => []) : Promise.resolve([])
         ]);
         // conversation_views tablosundan görüntüleme zamanlarını al  
         const viewMap = {};
