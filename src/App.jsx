@@ -1676,6 +1676,8 @@ export default function App() {
   const [aktifKonusma, setAktifKonusma] = useState(null);
   const [okunmamis, setOkunmamis]   = useState(0);
   const sonMesajZaman = useState({ current: Date.now() })[0];
+  const isMobile = useIsMobile();
+  const [drawerAcik, setDrawerAcik] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -1767,9 +1769,6 @@ export default function App() {
   );
 
   if (!kullanici) return <><style>{GLOBAL_STYLE}</style><Login /></>;
-
-  const isMobile = useIsMobile();
-  const [drawerAcik, setDrawerAcik] = useState(false);
 
   function menuGit(key) {
     setAktifSayfa(key);
