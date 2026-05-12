@@ -292,7 +292,7 @@ function Sohbet({ konusmaId, profil, onGeri, isMobile = false }) {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: isMobile ? "#16a34a" : "#fff", borderBottom: "1px solid #e5e7eb", padding: isMobile ? "10px 14px" : "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: isMobile ? "#16a34a" : "#fff", borderBottom: "1px solid #e5e7eb", padding: isMobile ? "10px 14px" : "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onGeri} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: isMobile ? "#fff" : "#6b7280", padding: "2px 6px" }}>←</button>
           <div style={{ width: 36, height: 36, borderRadius: "50%", background: isMobile ? "#15803d" : "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: isMobile ? "#fff" : "#16a34a", fontWeight: 700, border: isMobile ? "2px solid #dcfce7" : "none" }}>
@@ -683,11 +683,11 @@ function OzetBant({ profil, isMobile = false }) {
     async function yukle() {
       const bugun = new Date(); bugun.setHours(0,0,0,0);
       const [benim, bekleyen, bugunKonusmalar] = await Promise.all([
-        supabase.from("conversations").select("id", { count: "exact" }).eq("assigned_agent", profil?.id).eq("status", "open"),
-        supabase.from("conversations").select("id", { count: "exact" }).is("assigned_agent", null).eq("status", "open"),
-        supabase.from("conversations").select("id", { count: "exact" }).gte("created_at", bugun.toISOString())
+        getKonusmalar({ _raw: `?assigned_agent=eq.${profil.id}&status=eq.open&select=id` }),
+        getKonusmalar({ _raw: `?assigned_agent=is.null&status=eq.open&select=id` }),
+        getKonusmalar({ _raw: `?created_at=gte.${bugun.toISOString()}&select=id` })
       ]);
-      setOzet({ benim: benim?.length || 0, bekleyen: bekleyen?.length || 0, bugun: bugunKonusmalar?.length || 0 });
+      setOzet({ benim: (benim||[]).length, bekleyen: (bekleyen||[]).length, bugun: (bugunKonusmalar||[]).length });
     }
     if (profil?.id) yukle();
   }, [profil]);
@@ -763,7 +763,7 @@ function Dashboard({ profil, isMobile = false }) {
         <KpiKart baslik="Bekleyen"       deger={kpi.bekleyen}         alt="yanıt bekliyor" renk="#ef4444" icon="⏳" />
         <KpiKart baslik="Kapanma Oranı"  deger={"%" + kpi.kapanmaOrani} alt={kpi.satis + " satış"} renk="#f59e0b" icon="✅" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.6fr 1fr", gap: isMobile ? 12 : 20 }}>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 2 }}>Günlük Konuşma Trendi</div>
           <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 20 }}>Gelen · Kapanan · Satış</div>
@@ -1798,24 +1798,21 @@ export default function App() {
         {/* Mobil TopBar - Sohbet açıkken gizle */}
         {!aktifKonusma && (
           <div style={{ background: "#16a34a", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img src="/metalreyonu-wpdashboard/logo.jpg" alt="" style={{ height: 28, width: 28, objectFit: "contain", borderRadius: 5 }} />
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: "#fff" }}>Metal Reyonu</div>
-                <div style={{ fontSize: 10, color: "#bbf7d0" }}>WhatsApp Yönetim</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => setDrawerAcik(!drawerAcik)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 26, color: "#fff", lineHeight: 1, padding: 0 }}>☰</button>
               {okunmamis > 0 && (
-                <div style={{ position: "relative" }} onClick={() => menuGit("inbox")}>
-                  <span style={{ fontSize: 20, color: "#fff" }}>🔔</span>
+                <div style={{ position: "relative", cursor: "pointer" }} onClick={() => menuGit("inbox")}>
+                  <span style={{ fontSize: 22, color: "#fff" }}>🔔</span>
                   <span style={{ position: "absolute", top: -4, right: -4, background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 10, padding: "1px 5px" }}>{okunmamis}</span>
                 </div>
               )}
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#15803d", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12, border: "2px solid #dcfce7" }}>
-                {profil?.ad?.charAt(0) || "?"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: "#fff", textAlign: "right" }}>Metal Reyonu</div>
+                <div style={{ fontSize: 10, color: "#bbf7d0", textAlign: "right" }}>WhatsApp Yönetim</div>
               </div>
-              <button onClick={() => setDrawerAcik(!drawerAcik)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, color: "#fff", lineHeight: 1 }}>☰</button>
+              <img src="/metalreyonu-wpdashboard/logo.jpg" alt="" style={{ height: 36, width: 36, objectFit: "contain", borderRadius: 8, border: "2px solid rgba(255,255,255,0.3)" }} />
             </div>
           </div>
         )}
