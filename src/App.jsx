@@ -10,6 +10,18 @@ import {
   getHazirYanitlar, getTemsilciler, profilGuncelle, getKategoriler
 } from "./supabaseClient";
 
+
+// ── Mobil hook ────────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 // ── SES BİLDİRİMİ ────────────────────────────────────────────────────────
 function sesCaldir() {
   try {
@@ -128,9 +140,10 @@ function Login() {
     </div>
   );
 
+  const isMobile = useIsMobile();
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 400, padding: "0 24px" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: isMobile ? "0 16px" : "0 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <img src="/metalreyonu-wpdashboard/logo.jpg" alt="Metal Reyonu" style={{ height: 64, margin: "0 auto 14px", display: "block", objectFit: "contain" }} />
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 4 }}>Metal Reyonu</h1>
@@ -170,7 +183,7 @@ function Login() {
 }
 
 // ── SOHBET ─────────────────────────────────────────────────────────────────
-function Sohbet({ konusmaId, profil, onGeri }) {
+function Sohbet({ konusmaId, profil, onGeri, isMobile = false }) {
   const [konusma, setKonusma]     = useState(null);
   const [mesajlar, setMesajlar]   = useState([]);
   const [metin, setMetin]         = useState("");
@@ -279,25 +292,25 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: isMobile ? "#16a34a" : "#fff", borderBottom: "1px solid #e5e7eb", padding: isMobile ? "10px 14px" : "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={onGeri} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#6b7280", padding: "4px 8px" }}>←</button>
-          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700 }}>
+          <button onClick={onGeri} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: isMobile ? "#fff" : "#6b7280", padding: "2px 6px" }}>←</button>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: isMobile ? "#15803d" : "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: isMobile ? "#fff" : "#16a34a", fontWeight: 700, border: isMobile ? "2px solid #dcfce7" : "none" }}>
             {isim.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{isim}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>{konusma.contact_phone} · {konusma.category?.replace(/_/g, " ")}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: isMobile ? "#fff" : "#111827" }}>{isim}</div>
+            <div style={{ fontSize: 11, color: isMobile ? "#bbf7d0" : "#9ca3af" }}>{konusma.contact_phone} · {konusma.category?.replace(/_/g, " ")}</div>
           </div>
         </div>
         {konusma.assigned_agent ? (
           <button onClick={() => setSonucModal(true)}
-            style={{ padding: "8px 16px", borderRadius: 8, background: "#16a34a", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
+            style={{ padding: "7px 14px", borderRadius: 8, background: isMobile ? "#fff" : "#16a34a", color: isMobile ? "#16a34a" : "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>
             ✕ Kapat
           </button>
         ) : (
-          <div style={{ fontSize: 12, color: "#f59e0b", background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 14px", fontWeight: 600 }}>
-            ⚠️ Önce temsilci atanmalı
+          <div style={{ fontSize: 11, color: "#f59e0b", background: "#fffbeb", border: "1px solid #fed7aa", borderRadius: 8, padding: "6px 10px", fontWeight: 600 }}>
+            ⚠️ Atanmalı
           </div>
         )}
       </div>
@@ -308,12 +321,12 @@ function Sohbet({ konusmaId, profil, onGeri }) {
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f8fafc" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? 12 : 20, background: "#f8fafc" }}>
         {mesajlar.map(m => {
           const giden = m.direction === "outbound", not = m.direction === "note";
           return (
             <div key={m.id} style={{ display: "flex", justifyContent: not ? "center" : giden ? "flex-end" : "flex-start", marginBottom: 10 }}>
-              <div style={{ maxWidth: "70%", padding: "10px 14px",
+              <div style={{ maxWidth: isMobile ? "85%" : "70%", padding: "10px 14px",
                 borderRadius: not ? 8 : giden ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
                 background: not ? "#fffbeb" : giden ? "linear-gradient(135deg,#16a34a,#15803d)" : "#fff",
                 color: not ? "#92400e" : giden ? "#fff" : "#111827",
@@ -421,7 +434,7 @@ function Sohbet({ konusmaId, profil, onGeri }) {
 }
 
 // ── INBOX ──────────────────────────────────────────────────────────────────
-function Inbox({ profil, onSohbetAc }) {
+function Inbox({ profil, onSohbetAc, isMobile = false }) {
   const [konusmalar, setKonusmalar] = useState([]);
   const [filtre, setFiltre]         = useState("active");
   const [arama, setArama]           = useState("");
@@ -501,18 +514,20 @@ function Inbox({ profil, onSohbetAc }) {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff" }}>
-      <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f3f4f6" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>Inbox</h1>
-          <div style={{ fontSize: 12, color: "#9ca3af" }}>{liste.length} konuşma</div>
-        </div>
+      <div style={{ padding: isMobile ? "12px 14px" : "20px 24px 16px", borderBottom: "1px solid #f3f4f6" }}>
+        {!isMobile && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>Inbox</h1>
+            <div style={{ fontSize: 12, color: "#9ca3af" }}>{liste.length} konuşma</div>
+          </div>
+        )}
         <input value={arama} onChange={e => setArama(e.target.value)} placeholder="İsim veya telefon ara..."
           style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, marginBottom: 10, outline: "none" }} />
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 2 : 0 }}>
           {[["active","Aktif"],["open","Açık"],["beklemede","Beklemede"],["kapali","Kapalı"],["all","Tümü"]].map(([val, label]) => (
             <button key={val} onClick={() => setFiltre(val)}
-              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid", fontSize: 12, fontWeight: 500, cursor: "pointer",
-                background: filtre === val ? "#dcfce7" : "#fff", borderColor: filtre === val ? "#16a34a" : "#e5e7eb", color: filtre === val ? "#16a34a" : "#6b7280" }}>
+              style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
+                background: filtre === val ? "#16a34a" : "#fff", borderColor: filtre === val ? "#16a34a" : "#e5e7eb", color: filtre === val ? "#fff" : "#6b7280" }}>
               {label}
             </button>
           ))}
@@ -546,13 +561,10 @@ function Inbox({ profil, onSohbetAc }) {
                 const yeniSayi = yeniMesajSayilari[k.id] || 0;
                 const sonMesajTarih = k.last_message_at ? new Date(k.last_message_at) : null;
                 const sonMesajStr = sonMesajTarih ? sonMesajTarih.toLocaleDateString("tr-TR", {day:"2-digit",month:"2-digit"}) + " " + sonMesajTarih.toLocaleTimeString("tr-TR", {hour:"2-digit",minute:"2-digit"}) : "—";
-                return (
-                  <div key={k.id} onClick={() => { 
+                const handleKlik = () => {
                     onSohbetAc(k.id);
                     setYeniMesajSayilari(prev => ({...prev, [k.id]: 0}));
-                    // Görüntüleme zamanını Supabase'e kaydet
                     if (profil?.id) {
-                      // görüntüleme kaydı
                       fetch('https://jywohakixaodiyxilgsf.supabase.co/rest/v1/conversation_views', {
                         method: 'POST',
                         headers: {
@@ -564,12 +576,48 @@ function Inbox({ profil, onSohbetAc }) {
                         body: JSON.stringify({ user_id: profil.id, conversation_id: k.id, viewed_at: new Date().toISOString() })
                       }).catch(() => {});
                     }
-                  }}
+                  };
+
+                // Mobil kart layout
+                if (isMobile) return (
+                  <div key={k.id} onClick={handleKlik}
+                    style={{ padding: "12px 14px", borderBottom: "1px solid #f3f4f6", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: benim ? "#dcfce7" : "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", color: benim ? "#16a34a" : "#6b7280", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                        {isim.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isim}</div>
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{k.contact_phone}</div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: "#9ca3af" }}>{sure(k.last_message_at)}</span>
+                        {yeniSayi > 0 && <span style={{ background: "#16a34a", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 7px" }}>{yeniSayi}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, marginLeft: 50 }}>
+                      {k.assigned_profile ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: benim ? "#dcfce7" : "#eff6ff", border: `1px solid ${benim ? "#86efac" : "#bfdbfe"}`, borderRadius: 20, padding: "2px 8px", fontSize: 11, color: benim ? "#15803d" : "#1d4ed8", fontWeight: 600 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: benim ? "#16a34a" : "#1d4ed8", display: "inline-block" }}></span>
+                          {benim ? `${k.assigned_profile.ad} (Ben)` : k.assigned_profile.ad}
+                        </span>
+                      ) : (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 20, padding: "2px 8px", fontSize: 11, color: "#92400e", fontWeight: 600 }}>⏳ Atanmamış</span>
+                      )}
+                      <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "2px 7px", borderRadius: 4 }}>{d.label}</span>
+                      {k.category && <span style={{ fontSize: 10, color: "#6b7280", background: "#f3f4f6", padding: "2px 7px", borderRadius: 4 }}>{k.category.replace(/_/g," ")}</span>}
+                    </div>
+                    {k.onceki_sonuc && <div style={{ marginTop: 4, marginLeft: 50, fontSize: 11, color: "#f59e0b" }}>⚠️ Önceki: {k.onceki_sonuc}</div>}
+                  </div>
+                );
+
+                // Desktop tablo layout
+                return (
+                  <div key={k.id} onClick={handleKlik}
                     style={{ padding: "10px 16px", borderBottom: "1px solid #f3f4f6", cursor: "pointer", borderLeft: benim ? "3px solid #16a34a" : "3px solid transparent", background: benim ? "#f0fdf4" : "#fff" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
                     onMouseLeave={e => e.currentTarget.style.background = benim ? "#f0fdf4" : "#fff"}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* Avatar + isim */}
                       <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
                         {isim.charAt(0).toUpperCase()}
                       </div>
@@ -577,19 +625,14 @@ function Inbox({ profil, onSohbetAc }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={isim}>{isimKisa}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af" }}>{k.contact_phone}</div>
                       </div>
-                      {/* Yeni mesaj sayısı */}
                       <div style={{ width: 32, flexShrink: 0, textAlign: "center" }}>
                         {yeniSayi > 0 && <span style={{ background: "#16a34a", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px" }}>{yeniSayi}</span>}
                       </div>
-                      {/* Son mesaj tarihi */}
                       <div style={{ flex: 1, fontSize: 11, color: "#6b7280", whiteSpace: "nowrap" }}>{sonMesajStr}</div>
-                      {/* Geçen süre */}
                       <div style={{ width: 36, fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", textAlign: "right" }}>{sure(k.last_message_at)}</div>
-                      {/* Statü */}
                       <div style={{ width: 60, flexShrink: 0, textAlign: "right" }}>
                         <span style={{ fontSize: 10, fontWeight: 600, color: d.renk, background: d.renk + "15", padding: "2px 6px", borderRadius: 4 }}>{d.label}</span>
                       </div>
-                      {/* Atanan */}
                       <div style={{ width: 80, flexShrink: 0, textAlign: "right" }}>
                         {k.assigned_profile ? (
                           <span style={{ fontSize: 10, color: "#16a34a", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>
@@ -633,7 +676,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-function OzetBant({ profil }) {
+function OzetBant({ profil, isMobile = false }) {
   const [ozet, setOzet] = useState({ benim: 0, bekleyen: 0, bugun: 0 });
 
   useEffect(() => {
@@ -651,8 +694,24 @@ function OzetBant({ profil }) {
 
   const ROL = { super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" };
 
+  // Mobilde sadece KPI bandı göster (isim/avatar topbar'da var)
+  if (isMobile) return (
+    <div style={{ background: "#15803d", padding: "8px 16px", display: "flex", justifyContent: "space-around", flexShrink: 0 }}>
+      {[
+        { label: "Bende Açık", val: ozet.benim },
+        { label: "Atanmamış", val: ozet.bekleyen },
+        { label: "Bugün Gelen", val: ozet.bugun },
+      ].map((m, i) => (
+        <div key={i} style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{m.val}</div>
+          <div style={{ fontSize: 10, color: "#bbf7d0" }}>{m.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div style={{ background: "linear-gradient(135deg,#16a34a,#15803d)", padding: "12px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ background: "linear-gradient(135deg,#16a34a,#15803d)", padding: "12px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
           {profil?.ad?.charAt(0) || "?"}
@@ -679,7 +738,7 @@ function OzetBant({ profil }) {
   );
 }
 
-function Dashboard({ profil }) {
+function Dashboard({ profil, isMobile = false }) {
   const [kpi, setKpi]               = useState({ bugunGelen: 0, haftaGelen: 0, bekleyen: 0, satis: 0, kapanmaOrani: 0 });
   const [gunluk, setGunluk]         = useState([]);
   const [kategoriler, setKategoriler] = useState([]);
@@ -697,7 +756,7 @@ function Dashboard({ profil }) {
         <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 2 }}>Genel Bakış</h1>
         <p style={{ fontSize: 13, color: "#6b7280" }}>Hoş geldin, {profil?.ad} · Son 15 gün</p>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(5,1fr)", gap: isMobile ? 10 : 16, marginBottom: 24 }}>
         <KpiKart baslik="Bugün Gelen"    deger={kpi.bugunGelen}       alt="yeni konuşma"   renk="#16a34a" icon="💬" />
         <KpiKart baslik="Bugün Mesaj"    deger={kpi.bugunMesaj || 0}  alt="toplam mesaj"   renk="#8b5cf6" icon="✉️" />
         <KpiKart baslik="Bu Hafta"       deger={kpi.haftaGelen}       alt="toplam konuşma" renk="#0891b2" icon="📅" />
@@ -762,6 +821,7 @@ function Dashboard({ profil }) {
 
 // ── PROFIL ──────────────────────────────────────────────────────────────────
 function Profil({ profil }) {
+  const isMobile = useIsMobile();
   const [ad, setAd]         = useState(profil?.ad || "");
   const [soyad, setSoyad]   = useState(profil?.soyad || "");
   const [yeniSifre, setYeniSifre]   = useState("");
@@ -796,7 +856,7 @@ function Profil({ profil }) {
   const DURUM_RENK = { aktif: "#16a34a", izinde: "#f59e0b", pasif: "#ef4444" };
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 600 }}>
+    <div style={{ padding: isMobile ? "12px" : "28px 32px", maxWidth: isMobile ? "100%" : 600 }}>
       <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 24 }}>Profil</h1>
       {mesaj && (
         <div style={{ padding: "10px 16px", borderRadius: 8, marginBottom: 20, fontSize: 13, fontWeight: 500,
@@ -832,7 +892,7 @@ function Profil({ profil }) {
         </div>
         {sekme === "profil" ? (
           <form onSubmit={profilKaydet}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               {[["Ad", ad, setAd], ["Soyad", soyad, setSoyad]].map(([label, val, setter]) => (
                 <div key={label}>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
@@ -945,7 +1005,9 @@ function AtamaKuyrugu({ profil }) {
 }
 
 // ── PERFORMANS RAPORU ───────────────────────────────────────────────────────
-function PerformansRaporu({ profil }) {
+function PerformansRaporu({ profil, isMobile = false }) {
+  const isMobileLocal = useIsMobile();
+  const mob = isMobile || isMobileLocal;
   const [temsilciler, setTemsilciler] = useState([]);
   const [yukleniyor, setYukleniyor]   = useState(true);
   const [donem, setDonem]             = useState("hafta");
@@ -1393,7 +1455,9 @@ function TemsilciYonetimi({ profil }) {
 
 
 // ── RAPORLAMA ──────────────────────────────────────────────────────────────
-function Raporlama({ profil }) {
+function Raporlama({ profil, isMobile = false }) {
+  const isMobileLocal = useIsMobile();
+  const mob = isMobile || isMobileLocal;
   const bugun = new Date().toISOString().split("T")[0];
   const ayBaslangic = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
@@ -1704,6 +1768,118 @@ export default function App() {
 
   if (!kullanici) return <><style>{GLOBAL_STYLE}</style><Login /></>;
 
+  const isMobile = useIsMobile();
+  const [drawerAcik, setDrawerAcik] = useState(false);
+
+  function menuGit(key) {
+    setAktifSayfa(key);
+    setAktifKonusma(null);
+    setDrawerAcik(false);
+    if (key === "inbox") { setOkunmamis(0); sonMesajZaman.current = Date.now(); }
+  }
+
+  const icerik = aktifKonusma
+    ? <Sohbet konusmaId={aktifKonusma} profil={profil} onGeri={() => { setAktifKonusma(null); setAktifSayfa("inbox"); }} isMobile={isMobile} />
+    : aktifSayfa === "dashboard"         ? <Dashboard profil={profil} isMobile={isMobile} />
+    : aktifSayfa === "inbox"             ? <Inbox profil={profil} onSohbetAc={id => setAktifKonusma(id)} isMobile={isMobile} />
+    : aktifSayfa === "atama_kuyrugu"     ? <AtamaKuyrugu profil={profil} />
+    : aktifSayfa === "performans"        ? <PerformansRaporu profil={profil} />
+    : aktifSayfa === "kategori"          ? <KategoriYonetimi profil={profil} />
+    : aktifSayfa === "hazir_yanitlar"    ? <HazirYanitlar profil={profil} />
+    : aktifSayfa === "temsilci_yonetimi" ? <TemsilciYonetimi profil={profil} />
+    : aktifSayfa === "raporlama"         ? <Raporlama profil={profil} />
+    : aktifSayfa === "profil"            ? <Profil profil={profil} />
+    : null;
+
+  // ── MOBİL LAYOUT ─────────────────────────────────────────────────────────
+  if (isMobile) return (
+    <>
+      <style>{GLOBAL_STYLE}</style>
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+        {/* Mobil TopBar - Sohbet açıkken gizle */}
+        {!aktifKonusma && (
+          <div style={{ background: "#16a34a", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img src="/metalreyonu-wpdashboard/logo.jpg" alt="" style={{ height: 28, width: 28, objectFit: "contain", borderRadius: 5 }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: "#fff" }}>Metal Reyonu</div>
+                <div style={{ fontSize: 10, color: "#bbf7d0" }}>WhatsApp Yönetim</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              {okunmamis > 0 && (
+                <div style={{ position: "relative" }} onClick={() => menuGit("inbox")}>
+                  <span style={{ fontSize: 20, color: "#fff" }}>🔔</span>
+                  <span style={{ position: "absolute", top: -4, right: -4, background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 10, padding: "1px 5px" }}>{okunmamis}</span>
+                </div>
+              )}
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#15803d", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12, border: "2px solid #dcfce7" }}>
+                {profil?.ad?.charAt(0) || "?"}
+              </div>
+              <button onClick={() => setDrawerAcik(!drawerAcik)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, color: "#fff", lineHeight: 1 }}>☰</button>
+            </div>
+          </div>
+        )}
+
+        {/* KPI Bandı - Sohbet açıkken gizle */}
+        {!aktifKonusma && <OzetBant profil={profil} isMobile={isMobile} />}
+
+        {/* Drawer Menü */}
+        {drawerAcik && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }}>
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} onClick={() => setDrawerAcik(false)} />
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 280, background: "#fff", display: "flex", flexDirection: "column", zIndex: 101 }}>
+              <div style={{ background: "#16a34a", padding: "20px 16px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <img src="/metalreyonu-wpdashboard/logo.jpg" alt="" style={{ height: 36, width: 36, objectFit: "contain", borderRadius: 8 }} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: "#fff" }}>Metal Reyonu</div>
+                    <div style={{ fontSize: 11, color: "#bbf7d0" }}>WhatsApp Yönetim</div>
+                  </div>
+                  <button onClick={() => setDrawerAcik(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>✕</button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, background: "#15803d", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#0f7a2d", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 14, border: "2px solid #dcfce7" }}>
+                    {profil?.ad?.charAt(0) || "?"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{profil?.ad} {profil?.soyad}</div>
+                    <div style={{ fontSize: 11, color: "#bbf7d0" }}>{{ super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" }[profil?.rol]}</div>
+                  </div>
+                </div>
+              </div>
+              <nav style={{ flex: 1, padding: "8px 10px", overflowY: "auto" }}>
+                {MENU.filter(m => m.roller.includes(profil?.rol || "temsilci")).map(item => (
+                  <button key={item.key} onClick={() => menuGit(item.key)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 14, fontWeight: aktifSayfa === item.key ? 600 : 400, textAlign: "left", width: "100%", marginBottom: 2,
+                      background: aktifSayfa === item.key ? "#dcfce7" : "transparent",
+                      color: aktifSayfa === item.key ? "#16a34a" : "#374151" }}>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.key === "inbox" && okunmamis > 0 && (
+                      <span style={{ background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 10, padding: "2px 8px" }}>{okunmamis}</span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+              <div style={{ padding: "12px 16px", borderTop: "1px solid #e5e7eb" }}>
+                <button onClick={async () => { await cikisYap(); localStorage.clear(); window.location.reload(); }}
+                  style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 14, cursor: "pointer" }}>
+                  🚪 Çıkış Yap
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* İçerik */}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {icerik}
+        </div>
+      </div>
+    </>
+  );
+
+  // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────
   return (
     <>
       <style>{GLOBAL_STYLE}</style>
@@ -1721,7 +1897,7 @@ export default function App() {
           </div>
           <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
             {MENU.filter(m => m.roller.includes(profil?.rol || "temsilci")).map(item => (
-              <button key={item.key} onClick={() => { setAktifSayfa(item.key); setAktifKonusma(null); if (item.key === "inbox") { setOkunmamis(0); sonMesajZaman.current = Date.now(); } }}
+              <button key={item.key} onClick={() => menuGit(item.key)}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aktifSayfa === item.key ? 600 : 500, textAlign: "left", width: "100%",
                   background: aktifSayfa === item.key ? "#dcfce7" : "transparent",
                   color: aktifSayfa === item.key ? "#16a34a" : "#6b7280" }}>
@@ -1742,11 +1918,7 @@ export default function App() {
                 <div style={{ fontSize: 10, color: "#9ca3af" }}>{{ super_admin: "Süper Admin", admin: "Admin", temsilci: "Temsilci" }[profil?.rol]}</div>
               </div>
             </div>
-            <button onClick={async () => { 
-              await cikisYap(); 
-              localStorage.clear();
-              window.location.reload();
-            }}
+            <button onClick={async () => { await cikisYap(); localStorage.clear(); window.location.reload(); }}
               style={{ width: "100%", padding: 7, borderRadius: 7, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer" }}>
               Çıkış Yap
             </button>
@@ -1757,18 +1929,7 @@ export default function App() {
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
           <OzetBant profil={profil} />
           <div style={{ flex: 1, overflow: "auto" }}>
-          {aktifKonusma
-            ? <Sohbet konusmaId={aktifKonusma} profil={profil} onGeri={() => { setAktifKonusma(null); setAktifSayfa("inbox"); }} />
-            : aktifSayfa === "dashboard"      ? <Dashboard profil={profil} />
-            : aktifSayfa === "inbox"          ? <Inbox profil={profil} onSohbetAc={id => setAktifKonusma(id)} />
-            : aktifSayfa === "atama_kuyrugu"  ? <AtamaKuyrugu profil={profil} />
-            : aktifSayfa === "performans"     ? <PerformansRaporu profil={profil} />
-            : aktifSayfa === "kategori"       ? <KategoriYonetimi profil={profil} />
-            : aktifSayfa === "hazir_yanitlar" ? <HazirYanitlar profil={profil} />
-            : aktifSayfa === "temsilci_yonetimi" ? <TemsilciYonetimi profil={profil} />
-            : aktifSayfa === "raporlama"         ? <Raporlama profil={profil} />
-            : aktifSayfa === "profil"         ? <Profil profil={profil} />
-            : null}
+            {icerik}
           </div>
         </div>
       </div>
